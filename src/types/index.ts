@@ -41,6 +41,7 @@ export interface Project {
 export interface AuthState {
   isAuthenticated: boolean;
   user: User | null;
+  isLoading?: boolean;
 }
 
 export interface AppState {

@@ -1,10 +1,12 @@
-import React, { createContext, useContext, useReducer, ReactNode } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { AppState, Blueprint, Project, User } from '@/types';
-import { mockBlueprints, mockProjects, mockUser } from '@/data/mockData';
+import { mockBlueprints, mockProjects } from '@/data/mockData';
+import { onAuthStateChange } from '@/services/authService';
 
 type AppAction = 
   | { type: 'LOGIN'; payload: User }
   | { type: 'LOGOUT' }
+  | { type: 'SET_AUTH_LOADING'; payload: boolean }
   | { type: 'ADD_BLUEPRINT'; payload: Blueprint }
   | { type: 'UPDATE_BLUEPRINT'; payload: Blueprint }
   | { type: 'DELETE_BLUEPRINT'; payload: string }
@@ -17,7 +19,8 @@ type AppAction =
 const initialState: AppState = {
   auth: {
     isAuthenticated: false,
-    user: null
+    user: null,
+    isLoading: true // Start with loading true for auth state check
   },
   blueprints: mockBlueprints,
   projects: mockProjects,
@@ -37,7 +40,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         auth: {
           isAuthenticated: true,
-          user: action.payload
+          user: action.payload,
+          isLoading: false
         }
       };
     
@@ -46,7 +50,17 @@ function appReducer(state: AppState, action: AppAction): AppState {
         ...state,
         auth: {
           isAuthenticated: false,
-          user: null
+          user: null,
+          isLoading: false
+        }
+      };
+    
+    case 'SET_AUTH_LOADING':
+      return {
+        ...state,
+        auth: {
+          ...state.auth,
+          isLoading: action.payload
         }
       };
     
@@ -109,6 +123,20 @@ function appReducer(state: AppState, action: AppAction): AppState {
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
+
+  // Set up authentication state listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChange((user) => {
+      if (user) {
+        dispatch({ type: 'LOGIN', payload: user });
+      } else {
+        dispatch({ type: 'SET_AUTH_LOADING', payload: false });
+      }
+    });
+
+    // Cleanup subscription on unmount
+    return () => unsubscribe();
+  }, []);
 
   return (
     <AppContext.Provider value={{ state, dispatch }}>
