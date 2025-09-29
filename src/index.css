@@ -1,0 +1,286 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Engineering Blue Palette */
+    --background: 220 20% 97%;
+    --foreground: 215 25% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 15%;
+
+    /* Industrial Blue Primary */
+    --primary: 217 91% 60%;
+    --primary-hover: 217 91% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Steel Gray Secondary */
+    --secondary: 215 20% 95%;
+    --secondary-hover: 215 20% 90%;
+    --secondary-foreground: 215 25% 20%;
+
+    --muted: 215 20% 95%;
+    --muted-foreground: 215 15% 45%;
+
+    /* Tech Accent Colors */
+    --accent: 215 20% 95%;
+    --accent-foreground: 215 25% 20%;
+
+    /* Success Green for Confirmations */
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+
+    /* Warning Orange */
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 20% 88%;
+    --input: 215 20% 92%;
+    --ring: 217 91% 60%;
+
+    --radius: 0.75rem;
+
+    /* Glass Morphism Effects */
+    --glass-bg: 0 0% 100% / 0.8;
+    --glass-border: 215 20% 88% / 0.5;
+    
+    /* Engineering Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 60%), hsl(217 91% 50%));
+    --gradient-tech: linear-gradient(135deg, hsl(215 25% 15%), hsl(215 25% 25%));
+    --gradient-surface: linear-gradient(180deg, hsl(0 0% 100%), hsl(215 20% 98%));
+    
+    /* Shadows */
+    --shadow-soft: 0 2px 8px hsl(215 25% 15% / 0.08);
+    --shadow-medium: 0 4px 16px hsl(215 25% 15% / 0.12);
+    --shadow-strong: 0 8px 32px hsl(215 25% 15% / 0.16);
+    --shadow-glow: 0 0 24px hsl(217 91% 60% / 0.3);
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    --background: 215 25% 12%;
+    --foreground: 0 0% 98%;
+
+    --card: 215 25% 15%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 215 25% 15%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 217 91% 65%;
+    --primary-hover: 217 91% 70%;
+    --primary-foreground: 215 25% 12%;
+
+    --secondary: 215 25% 20%;
+    --secondary-hover: 215 25% 25%;
+    --secondary-foreground: 0 0% 90%;
+
+    --muted: 215 25% 18%;
+    --muted-foreground: 215 15% 65%;
+
+    --accent: 215 25% 18%;
+    --accent-foreground: 0 0% 90%;
+
+    --success: 142 71% 55%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 60%;
+    --warning-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 65%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 25% 25%;
+    --input: 215 25% 20%;
+    --ring: 217 91% 65%;
+
+    --glass-bg: 215 25% 15% / 0.8;
+    --glass-border: 215 25% 30% / 0.5;
+    
+    --gradient-primary: linear-gradient(135deg, hsl(217 91% 65%), hsl(217 91% 55%));
+    --gradient-tech: linear-gradient(135deg, hsl(215 25% 25%), hsl(215 25% 35%));
+    --gradient-surface: linear-gradient(180deg, hsl(215 25% 12%), hsl(215 25% 15%));
+    
+    --shadow-soft: 0 2px 8px hsl(0 0% 0% / 0.3);
+    --shadow-medium: 0 4px 16px hsl(0 0% 0% / 0.4);
+    --shadow-strong: 0 8px 32px hsl(0 0% 0% / 0.5);
+    --shadow-glow: 0 0 24px hsl(217 91% 65% / 0.4);
+
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-inter;
+  }
+}
+
+@layer components {
+  /* Glass Morphism Components */
+  .glass {
+    @apply bg-white/80 backdrop-blur-sm border border-white/50;
+  }
+
+  .glass-card {
+    @apply bg-white/90 backdrop-blur-md border border-white/20 shadow-medium rounded-xl;
+  }
+
+  /* Engineering Button Variants */
+  .btn-tech {
+    @apply bg-gradient-to-r from-primary to-primary-hover text-primary-foreground shadow-medium hover:shadow-glow transition-all duration-300;
+  }
+
+  .btn-outline-tech {
+    @apply border-2 border-primary text-primary bg-transparent hover:bg-primary hover:text-primary-foreground transition-all duration-300;
+  }
+
+  /* Upload Area Styling */
+  .upload-area {
+    @apply border-2 border-dashed border-border bg-muted/30 hover:border-primary hover:bg-primary/5 transition-all duration-300 rounded-xl;
+  }
+
+  .upload-area-active {
+    @apply border-primary bg-primary/10 scale-[1.02] shadow-glow;
+  }
+
+  /* Blueprint Viewer */
+  .blueprint-viewer {
+    @apply bg-slate-50 border border-border rounded-lg shadow-medium overflow-hidden;
+  }
+
+  /* Symbol Highlight */
+  .symbol-highlight {
+    @apply border-2 border-warning bg-warning/20 rounded-sm animate-pulse;
+  }
+
+  /* Navigation Styles */
+  .nav-link {
+    @apply flex items-center gap-3 px-4 py-3 text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-lg transition-all duration-200;
+  }
+
+  .nav-link-active {
+    @apply bg-primary/10 text-primary border-r-2 border-primary;
+  }
+
+  /* Project Card */
+  .project-card {
+    @apply bg-card border border-border rounded-xl p-6 hover:shadow-medium hover:scale-[1.02] transition-all duration-300 cursor-pointer;
+  }
+
+  /* Loading Animations */
+  .loading-spinner {
+    @apply animate-spin rounded-full border-4 border-muted border-t-primary;
+  }
+
+  /* Success Checkmark Animation */
+  .success-checkmark {
+    @apply text-success animate-[checkmark_0.6s_ease-in-out];
+  }
+}
+
+@layer utilities {
+  /* Custom Animations */
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+
+  /* Text Utilities */
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary to-primary-hover bg-clip-text text-transparent;
+  }
+
+  /* Font Families */
+  .font-inter {
+    font-family: 'Inter', sans-serif;
+  }
+
+  .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+/* Keyframe Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes checkmark {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
