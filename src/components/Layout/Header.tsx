@@ -1,8 +1,9 @@
 import { Button } from '@/components/ui/button';
 import { Settings, FileText, LogOut } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
-import { signOutUser } from '@/services/authService';
+import { forceLogout } from '@/services/authService';
 import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 interface HeaderProps {
   showAuthButtons?: boolean;
@@ -13,11 +14,13 @@ interface HeaderProps {
 export function Header({ showAuthButtons, onLoginClick, onSignUpClick }: HeaderProps) {
   const { state, dispatch } = useApp();
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   const handleLogout = async () => {
     try {
-      await signOutUser();
-      dispatch({ type: 'LOGOUT' });
+      console.log('🚪 Logout button clicked');
+      await forceLogout();
+      
       toast({
         title: "Logged out",
         description: "You have been successfully logged out.",

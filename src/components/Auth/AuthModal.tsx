@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { X, Mail, Loader2 } from 'lucide-react';
+import { Mail, Loader2 } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { signInWithEmail, signUpWithEmail, signInWithGoogle } from '@/services/authService';
 import { useToast } from '@/hooks/use-toast';
@@ -93,14 +93,11 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
         <div className="flex">
           {/* Left Side - Form */}
           <div className="flex-1 p-8">
-            <div className="flex items-center justify-between mb-6">
+            <DialogHeader className="mb-6">
               <DialogTitle className="text-2xl font-bold">
                 {mode === 'login' ? 'Login now!' : 'Sign up now!'}
               </DialogTitle>
-              <Button variant="ghost" size="sm" onClick={onClose}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
+            </DialogHeader>
 
             <div className="space-y-6">
               {/* Google Sign In */}

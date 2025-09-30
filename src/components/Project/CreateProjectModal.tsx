@@ -6,7 +6,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { CheckCircle, X } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
-import { Project } from '@/types';
+import { createProject } from '@/services/projectService';
+import { useToast } from '@/hooks/use-toast';
 
 interface CreateProjectModalProps {
   isOpen: boolean;
@@ -17,31 +18,55 @@ export function CreateProjectModal({ isOpen, onClose }: CreateProjectModalProps)
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [created, setCreated] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   const { dispatch } = useApp();
+  const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!name.trim()) return;
 
-    const newProject: Project = {
-      id: `project-${Date.now()}`,
-      name: name.trim(),
-      description: description.trim(),
-      createdDate: new Date(),
-      blueprints: []
-    };
+    setIsLoading(true);
+    
+    try {
+      console.log('📁 Creating project:', { name: name.trim(), description: description.trim() });
+      
+      const response = await createProject({
+        name: name.trim(),
+        description: description.trim()
+      });
 
-    dispatch({ type: 'ADD_PROJECT', payload: newProject });
-    
-    setCreated(true);
-    
-    setTimeout(() => {
-      setCreated(false);
-      resetForm();
-      onClose();
-    }, 1500);
+      if (response.success && response.data) {
+        // Add to local state
+        dispatch({ type: 'ADD_PROJECT', payload: response.data });
+        
+        setCreated(true);
+        
+        toast({
+          title: "Project Created",
+          description: `"${name}" has been created successfully.`,
+        });
+
+        setTimeout(() => {
+          setCreated(false);
+          resetForm();
+          onClose();
+        }, 1500);
+      } else {
+        throw new Error(response.message || 'Failed to create project');
+      }
+    } catch (error) {
+      console.error('❌ Error creating project:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to create project.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const resetForm = () => {
@@ -114,11 +139,15 @@ export function CreateProjectModal({ isOpen, onClose }: CreateProjectModalProps)
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-border">
-            <Button type="button" variant="outline" onClick={handleClose}>
+            <Button type="button" variant="outline" onClick={handleClose} disabled={isLoading}>
               Cancel
             </Button>
-            <Button type="submit" className="btn-tech" disabled={!name.trim()}>
-              Create Project
+            <Button 
+              type="submit" 
+              className="btn-tech" 
+              disabled={!name.trim() || isLoading}
+            >
+              {isLoading ? 'Creating...' : 'Create Project'}
             </Button>
           </div>
         </form>

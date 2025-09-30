@@ -34,7 +34,7 @@ export interface Project {
   id: string;
   name: string;
   description: string;
-  createdDate: Date;
+  createdAt: Date;
   blueprints: Blueprint[];
 }
 
@@ -47,7 +47,9 @@ export interface AuthState {
 export interface AppState {
   auth: AuthState;
   blueprints: Blueprint[];
+  blueprintsLoading?: boolean;
   projects: Project[];
+  projectsLoading?: boolean;
   currentBlueprint: Blueprint | null;
   currentProject: Project | null;
 }

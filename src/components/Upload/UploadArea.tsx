@@ -6,9 +6,10 @@ import { Progress } from '@/components/ui/progress';
 import { Blueprint, MechanicalSymbol } from '@/types';
 import { symbolTypes } from '@/data/mockData';
 import { useApp } from '@/context/AppContext';
+import { uploadBlueprint, testBackendConnection } from '@/services/blueprintService';
 
 interface UploadAreaProps {
-  onBlueprintUploaded: (blueprint: Blueprint) => void;
+  onBlueprintUploaded: (blueprint: Blueprint, file?: File) => void;
   isProcessing: boolean;
   setIsProcessing: (processing: boolean) => void;
 }
@@ -16,6 +17,8 @@ interface UploadAreaProps {
 export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing }: UploadAreaProps) {
   const [progress, setProgress] = useState(0);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState<string>('');
   const { dispatch } = useApp();
 
   const generateMockSymbols = (): MechanicalSymbol[] => {
@@ -41,57 +44,84 @@ export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing 
     return symbols;
   };
 
-  const simulateProcessing = (file: File) => {
+  const processUpload = async (file: File) => {
     setIsProcessing(true);
+    setUploadStatus('uploading');
     setProgress(0);
+    setErrorMessage('');
 
-    const steps = [
-      { progress: 20, message: 'Uploading file...', delay: 500 },
-      { progress: 40, message: 'Analyzing image...', delay: 800 },
-      { progress: 60, message: 'Detecting symbols...', delay: 1200 },
-      { progress: 80, message: 'Processing results...', delay: 800 },
-      { progress: 100, message: 'Complete!', delay: 500 }
-    ];
+    try {
+      // Step 1: Test backend connection
+      setProgress(10);
+      const connectionTest = await testBackendConnection();
+      
+      if (!connectionTest.backend) {
+        throw new Error('Backend server is not available');
+      }
 
-    let currentStep = 0;
+      if (!connectionTest.auth) {
+        throw new Error('Please sign in to upload blueprints');
+      }
 
-    const processStep = () => {
-      if (currentStep < steps.length) {
-        const step = steps[currentStep];
-        setTimeout(() => {
-          setProgress(step.progress);
-          currentStep++;
-          processStep();
-        }, step.delay);
-      } else {
-        // Create mock blueprint
-        const symbols = generateMockSymbols();
-        const blueprint: Blueprint = {
-          id: `blueprint-${Date.now()}`,
-          name: file.name.replace(/\.[^/.]+$/, ''),
-          description: 'Uploaded blueprint with AI symbol detection',
-          imageUrl: URL.createObjectURL(file),
-          uploadDate: new Date(),
-          symbols,
-          totalSymbols: symbols.length,
-          averageAccuracy: symbols.reduce((acc, s) => acc + s.confidence, 0) / symbols.length * 100
-        };
+      // Step 2: Upload file
+      setProgress(30);
+      const uploadResult = await uploadBlueprint(
+        file,
+        file.name.replace(/\.[^/.]+$/, ''),
+        'Uploaded blueprint with AI symbol detection'
+      );
 
-        dispatch({ type: 'ADD_BLUEPRINT', payload: blueprint });
-        onBlueprintUploaded(blueprint);
+      if (!uploadResult.success) {
+        throw new Error(uploadResult.message || 'Upload failed');
+      }
+
+      setProgress(70);
+
+      // Step 3: Process the uploaded blueprint data
+      const uploadedBlueprint = uploadResult.data;
+      
+      // For now, add mock symbols since AI processing isn't implemented yet
+      const symbols = generateMockSymbols();
+      const blueprint: Blueprint = {
+        id: uploadedBlueprint.id || `blueprint-${Date.now()}`,
+        name: uploadedBlueprint.name || file.name.replace(/\.[^/.]+$/, ''),
+        description: uploadedBlueprint.description || 'Uploaded blueprint with AI symbol detection',
+        imageUrl: uploadedBlueprint.imageUrl || URL.createObjectURL(file),
+        uploadDate: new Date(uploadedBlueprint.createdAt || Date.now()),
+        symbols,
+        totalSymbols: symbols.length,
+        averageAccuracy: symbols.reduce((acc, s) => acc + s.confidence, 0) / symbols.length
+      };
+
+      setProgress(90);
+
+      // Step 4: Pass blueprint to parent without adding to history
+      // History will be updated only when user chooses to save or upload new
+      onBlueprintUploaded(blueprint, file);
+
+      setProgress(100);
+      setUploadStatus('success');
+
+      setTimeout(() => {
         setIsProcessing(false);
         setProgress(0);
-      }
-    };
+        setUploadStatus('idle');
+      }, 1000);
 
-    processStep();
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      setErrorMessage(error.message || 'Upload failed');
+      setUploadStatus('error');
+      setIsProcessing(false);
+      setProgress(0);
+    }
   };
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     if (file) {
       setUploadedFile(file);
-      simulateProcessing(file);
+      processUpload(file);
     }
   }, []);
 
@@ -130,6 +160,37 @@ export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing 
               <span>{uploadedFile.name}</span>
             </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (uploadStatus === 'error') {
+    return (
+      <div className="space-y-6">
+        <div className="glass-card p-8 text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <AlertCircle className="w-8 h-8 text-red-500" />
+          </div>
+          <h3 className="text-xl font-semibold text-foreground mb-2">
+            Upload Failed
+          </h3>
+          <p className="text-red-600 mb-6">
+            {errorMessage || 'Something went wrong during upload'}
+          </p>
+          <div className="flex gap-3 justify-center">
+            <Button 
+              onClick={() => {
+                setUploadStatus('idle');
+                setErrorMessage('');
+                setUploadedFile(null);
+              }}
+              variant="outline"
+            >
+              Try Again
+            </Button>
+          </div>
         </div>
       </div>
     );

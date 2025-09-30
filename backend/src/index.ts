@@ -19,7 +19,12 @@ connectDB();
 
 // Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: [
+    'http://localhost:5173',
+    'http://localhost:8080', 
+    'http://localhost:8081',
+    process.env.FRONTEND_URL
+  ].filter((url): url is string => Boolean(url)),
   credentials: true
 }));
 app.use(express.json());

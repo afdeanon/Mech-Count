@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import { Project } from '../models/Project';
 import { Blueprint } from '../models/Blueprint';
 import { User } from '../models/User';
@@ -62,7 +63,7 @@ export const getProject = async (req: Request, res: Response) => {
       });
     }
 
-    const { id } = req.params;
+    const { projectId } = req.params;
 
     // Find user first
     const user = await User.findOne({ firebaseUid: req.user.uid });
@@ -73,7 +74,7 @@ export const getProject = async (req: Request, res: Response) => {
       });
     }
 
-    const project = await Project.findOne({ _id: id, userId: user._id })
+    const project = await Project.findOne({ _id: projectId, userId: user._id })
       .populate('blueprintIds');
 
     if (!project) {
@@ -161,7 +162,7 @@ export const updateProject = async (req: Request, res: Response) => {
       });
     }
 
-    const { id } = req.params;
+    const { projectId } = req.params;
 
     // Validate input
     const { error } = updateProjectSchema.validate(req.body);
@@ -183,7 +184,7 @@ export const updateProject = async (req: Request, res: Response) => {
     }
 
     const project = await Project.findOneAndUpdate(
-      { _id: id, userId: user._id },
+      { _id: projectId, userId: user._id },
       req.body,
       { new: true, runValidators: true }
     );
@@ -219,7 +220,7 @@ export const deleteProject = async (req: Request, res: Response) => {
       });
     }
 
-    const { id } = req.params;
+    const { projectId } = req.params;
 
     // Find user first
     const user = await User.findOne({ firebaseUid: req.user.uid });
@@ -230,7 +231,7 @@ export const deleteProject = async (req: Request, res: Response) => {
       });
     }
 
-    const project = await Project.findOneAndDelete({ _id: id, userId: user._id });
+    const project = await Project.findOneAndDelete({ _id: projectId, userId: user._id });
 
     if (!project) {
       return res.status(404).json({
@@ -239,15 +240,197 @@ export const deleteProject = async (req: Request, res: Response) => {
       });
     }
 
-    // Also delete associated blueprints
-    await Blueprint.deleteMany({ projectId: id });
+    // Also delete associated blueprints - convert projectId to ObjectId
+    const projectObjectId = new mongoose.Types.ObjectId(projectId);
+    
+    // Debug: Check what blueprints exist for this project before deletion
+    const blueprintsToDelete = await Blueprint.find({ projectId: projectObjectId });
+    console.log(`🔍 Found ${blueprintsToDelete.length} blueprints to delete for project ${projectId}`);
+    console.log('🔍 Blueprint IDs:', blueprintsToDelete.map(bp => bp._id));
+    
+    const deletedBlueprints = await Blueprint.deleteMany({ projectId: projectObjectId });
+    
+    console.log(`🗑️ Deleted ${deletedBlueprints.deletedCount} blueprints associated with project ${projectId}`);
 
     res.json({
       success: true,
-      message: 'Project deleted successfully'
+      message: 'Project deleted successfully',
+      data: {
+        deletedBlueprints: deletedBlueprints.deletedCount
+      }
     });
   } catch (error) {
     console.error('Error in deleteProject:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
+
+// Add blueprint to project
+export const addBlueprintToProject = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+    }
+
+    const { projectId } = req.params;
+    const { blueprintId } = req.body;
+
+    if (!projectId || !blueprintId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Project ID and Blueprint ID are required'
+      });
+    }
+
+    // Validate ObjectId formats
+    if (!mongoose.Types.ObjectId.isValid(projectId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid project ID format'
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(blueprintId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid blueprint ID format'
+      });
+    }
+
+    // Find user first
+    const user = await User.findOne({ firebaseUid: req.user.uid });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Verify project exists and belongs to user
+    const project = await Project.findOne({ _id: projectId, userId: user._id });
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: 'Project not found'
+      });
+    }
+
+    // Verify blueprint exists and belongs to user
+    const blueprint = await Blueprint.findOne({ _id: blueprintId, userId: user._id });
+    if (!blueprint) {
+      return res.status(404).json({
+        success: false,
+        message: 'Blueprint not found'
+      });
+    }
+
+    // Check if blueprint is already in project
+    const blueprintObjectId = new mongoose.Types.ObjectId(blueprintId);
+    if (project.blueprintIds.some(id => id.equals(blueprintObjectId))) {
+      return res.status(400).json({
+        success: false,
+        message: 'Blueprint is already in this project'
+      });
+    }
+
+    // Add blueprint to project
+    project.blueprintIds.push(blueprintObjectId);
+    await project.save();
+
+    // Update blueprint's projectId
+    blueprint.projectId = new mongoose.Types.ObjectId(projectId);
+    await blueprint.save();
+    
+    console.log(`📎 Successfully linked blueprint ${blueprintId} to project ${projectId}`);
+    console.log(`📎 Blueprint projectId is now: ${blueprint.projectId}`);
+
+    res.json({
+      success: true,
+      message: 'Blueprint added to project successfully',
+      data: project
+    });
+  } catch (error) {
+    console.error('Error in addBlueprintToProject:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error'
+    });
+  }
+};
+
+// Remove blueprint from project
+export const removeBlueprintFromProject = async (req: Request, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+    }
+
+    const { projectId, blueprintId } = req.params;
+
+    if (!projectId || !blueprintId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Project ID and Blueprint ID are required'
+      });
+    }
+
+    // Validate ObjectId formats
+    if (!mongoose.Types.ObjectId.isValid(projectId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid project ID format'
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(blueprintId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid blueprint ID format'
+      });
+    }
+
+    // Find user first
+    const user = await User.findOne({ firebaseUid: req.user.uid });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Verify project exists and belongs to user
+    const project = await Project.findOne({ _id: projectId, userId: user._id });
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: 'Project not found'
+      });
+    }
+
+    // Remove blueprint from project
+    const blueprintObjectId = new mongoose.Types.ObjectId(blueprintId);
+    project.blueprintIds = project.blueprintIds.filter(id => !id.equals(blueprintObjectId));
+    await project.save();
+
+    // Remove project reference from blueprint
+    await Blueprint.findByIdAndUpdate(blueprintId, { $unset: { projectId: 1 } });
+
+    res.json({
+      success: true,
+      message: 'Blueprint removed from project successfully',
+      data: project
+    });
+  } catch (error) {
+    console.error('Error in removeBlueprintFromProject:', error);
     res.status(500).json({
       success: false,
       message: 'Internal server error'

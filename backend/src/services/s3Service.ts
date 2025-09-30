@@ -1,6 +1,10 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { v4 as uuidv4 } from 'uuid';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 // Configure AWS S3 Client
 const s3Client = new S3Client({
@@ -11,7 +15,13 @@ const s3Client = new S3Client({
   },
 });
 
-const BUCKET_NAME = process.env.S3_BUCKET_NAME!;
+function getBucketName(): string {
+  const bucketName = process.env.S3_BUCKET_NAME;
+  if (!bucketName) {
+    throw new Error('S3_BUCKET_NAME environment variable is not set');
+  }
+  return bucketName;
+}
 
 export interface S3UploadResult {
   key: string;
@@ -29,12 +39,17 @@ export async function uploadToS3(
   folder: string = 'blueprints'
 ): Promise<S3UploadResult> {
   try {
+    const bucketName = getBucketName();
+
     // Generate unique filename
     const fileExtension = originalFilename.split('.').pop();
     const key = `${folder}/${uuidv4()}.${fileExtension}`;
 
+    console.log(`🪣 Using bucket: ${bucketName}`);
+    console.log(`🔑 Using key: ${key}`);
+
     const command = new PutObjectCommand({
-      Bucket: BUCKET_NAME,
+      Bucket: bucketName,
       Key: key,
       Body: buffer,
       ContentType: mimetype,
@@ -44,12 +59,12 @@ export async function uploadToS3(
     await s3Client.send(command);
 
     // Construct the public URL
-    const url = `https://${BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+    const url = `https://${bucketName}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
 
     return {
       key,
       url,
-      bucket: BUCKET_NAME,
+      bucket: bucketName,
     };
   } catch (error) {
     console.error('Error uploading to S3:', error);
@@ -62,8 +77,10 @@ export async function uploadToS3(
  */
 export async function deleteFromS3(key: string): Promise<void> {
   try {
+    const bucketName = getBucketName();
+
     const command = new DeleteObjectCommand({
-      Bucket: BUCKET_NAME,
+      Bucket: bucketName,
       Key: key,
     });
 
@@ -82,8 +99,10 @@ export async function getSignedUrlForS3(
   expiresIn: number = 3600
 ): Promise<string> {
   try {
+    const bucketName = getBucketName();
+
     const command = new GetObjectCommand({
-      Bucket: BUCKET_NAME,
+      Bucket: bucketName,
       Key: key,
     });
 

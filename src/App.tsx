@@ -17,6 +17,18 @@ const queryClient = new QueryClient();
 function AppRoutes() {
   const { state } = useApp();
 
+  // Show loading or prevent redirects while auth state is being determined
+  if (state.auth.isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <Routes>
       <Route 
@@ -36,7 +48,15 @@ function AppRoutes() {
         } 
       />
       <Route 
-        path="/history" 
+        path="/upload-blueprint" 
+        element={
+          state.auth.isAuthenticated ? 
+          <Dashboard /> : 
+          <Navigate to="/" replace />
+        } 
+      />
+      <Route 
+        path="/history/blueprints" 
         element={
           state.auth.isAuthenticated ? 
           <History /> : 
@@ -52,7 +72,7 @@ function AppRoutes() {
         } 
       />
       <Route 
-        path="/project/:id" 
+        path="/projects/:projectId" 
         element={
           state.auth.isAuthenticated ? 
           <ProjectDetail /> : 
@@ -60,7 +80,15 @@ function AppRoutes() {
         } 
       />
       <Route 
-        path="/blueprint/:id" 
+        path="/projects/:projectId/blueprints/:blueprintId" 
+        element={
+          state.auth.isAuthenticated ? 
+          <BlueprintDetail /> : 
+          <Navigate to="/" replace />
+        } 
+      />
+      <Route 
+        path="/history/blueprints/:blueprintId" 
         element={
           state.auth.isAuthenticated ? 
           <BlueprintDetail /> : 

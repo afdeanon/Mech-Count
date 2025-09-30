@@ -1,5 +1,4 @@
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Header } from '@/components/Layout/Header';
 import { Sidebar } from '@/components/Layout/Sidebar';
 import { Button } from '@/components/ui/button';
 import { BlueprintViewer } from '@/components/Blueprint/BlueprintViewer';
@@ -10,12 +9,12 @@ import { ArrowLeft, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 
 export function BlueprintDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { blueprintId, projectId } = useParams<{ blueprintId: string; projectId?: string }>();
   const navigate = useNavigate();
   const { state } = useApp();
   const [showSaveModal, setShowSaveModal] = useState(false);
 
-  const blueprint = state.blueprints.find(b => b.id === id);
+  const blueprint = state.blueprints.find(b => b.id === blueprintId);
   const project = blueprint?.projectId 
     ? state.projects.find(p => p.id === blueprint.projectId)
     : null;
@@ -23,10 +22,8 @@ export function BlueprintDetail() {
   if (!blueprint) {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
-        <div className="flex h-[calc(100vh-4rem)]">
-          <Sidebar />
-          <main className="flex-1 p-6 flex items-center justify-center">
+        <Sidebar />
+        <main className="ml-64 p-6 flex items-center justify-center">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-foreground mb-2">
                 Blueprint Not Found
@@ -34,12 +31,14 @@ export function BlueprintDetail() {
               <p className="text-muted-foreground mb-4">
                 The blueprint you're looking for doesn't exist.
               </p>
-              <Button onClick={() => navigate('/history')} variant="outline">
-                Back to History
+              <Button 
+                onClick={() => navigate(projectId ? `/projects/${projectId}` : '/history/blueprints')} 
+                variant="outline"
+              >
+                {projectId ? 'Back to Project' : 'Back to History'}
               </Button>
             </div>
           </main>
-        </div>
       </div>
     );
   }
@@ -50,10 +49,8 @@ export function BlueprintDetail() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-      <div className="flex h-[calc(100vh-4rem)]">
-        <Sidebar />
-        <main className="flex-1 p-6 overflow-auto">
+      <Sidebar />
+      <main className="ml-64 p-6">
           <div className="max-w-6xl mx-auto space-y-6">
             {/* Navigation */}
             <div className="flex items-center gap-4">
@@ -71,7 +68,7 @@ export function BlueprintDetail() {
               {project && (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Link 
-                    to={`/project/${project.id}`}
+                    to={`/projects/${project.id}`}
                     className="hover:text-foreground transition-colors"
                   >
                     {project.name}
@@ -120,7 +117,6 @@ export function BlueprintDetail() {
             />
           </div>
         </main>
-      </div>
 
       <SaveToProjectModal
         isOpen={showSaveModal}

@@ -1,6 +1,5 @@
 import { useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Header } from '@/components/Layout/Header';
 import { Sidebar } from '@/components/Layout/Sidebar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,24 +7,28 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { UploadArea } from '@/components/Upload/UploadArea';
 import { useApp } from '@/context/AppContext';
-import { ArrowLeft, Upload, Search, FileImage, Calendar, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Upload, Search, FileImage, Calendar, BarChart3, MoreVertical, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Blueprint } from '@/types';
+import { removeBlueprintFromProject } from '@/services/projectService';
+import { useToast } from '@/hooks/use-toast';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 export function ProjectDetail() {
-  const { id } = useParams<{ id: string }>();
+  const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
   const { state, dispatch } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [showUpload, setShowUpload] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
-  const project = state.projects.find(p => p.id === id);
+  const project = state.projects.find(p => p.id === projectId);
   
   // Get all blueprints not in this project for the "add existing" section
   const availableBlueprints = state.blueprints.filter(
-    bp => !bp.projectId || bp.projectId !== id
+    bp => !bp.projectId || bp.projectId !== projectId
   );
 
   // Filter available blueprints by search term
@@ -37,10 +40,8 @@ export function ProjectDetail() {
   if (!project) {
     return (
       <div className="min-h-screen bg-background">
-        <Header />
-        <div className="flex h-[calc(100vh-4rem)]">
-          <Sidebar />
-          <main className="flex-1 p-6 flex items-center justify-center">
+        <Sidebar />
+        <main className="ml-64 p-6 flex items-center justify-center">
             <div className="text-center">
               <h2 className="text-2xl font-bold text-foreground mb-2">
                 Project Not Found
@@ -53,14 +54,15 @@ export function ProjectDetail() {
               </Button>
             </div>
           </main>
-        </div>
       </div>
     );
   }
 
   const handleBlueprintUploaded = (blueprint: Blueprint) => {
+    if (!project || !projectId) return;
+    
     // Add blueprint to project
-    const updatedBlueprint = { ...blueprint, projectId: project.id };
+    const updatedBlueprint = { ...blueprint, projectId };
     dispatch({ type: 'UPDATE_BLUEPRINT', payload: updatedBlueprint });
     
     // Update project's blueprints
@@ -74,7 +76,9 @@ export function ProjectDetail() {
   };
 
   const handleAddExistingBlueprint = (blueprint: Blueprint) => {
-    const updatedBlueprint = { ...blueprint, projectId: project.id };
+    if (!project || !projectId) return;
+    
+    const updatedBlueprint = { ...blueprint, projectId };
     dispatch({ type: 'UPDATE_BLUEPRINT', payload: updatedBlueprint });
     
     // Update project's blueprints
@@ -85,14 +89,44 @@ export function ProjectDetail() {
     dispatch({ type: 'UPDATE_PROJECT', payload: updatedProject });
   };
 
-  const projectBlueprints = state.blueprints.filter(bp => bp.projectId === project.id);
+  const handleRemoveBlueprintFromProject = async (blueprintId: string, blueprintName: string) => {
+    if (!project || !projectId) return;
+    
+    if (confirm(`Are you sure you want to remove "${blueprintName}" from this project?`)) {
+      try {
+        const response = await removeBlueprintFromProject(projectId, blueprintId);
+        
+        if (response.success) {
+          // Update blueprint to remove projectId
+          const updatedBlueprint = state.blueprints.find(bp => bp.id === blueprintId);
+          if (updatedBlueprint) {
+            dispatch({ type: 'UPDATE_BLUEPRINT', payload: { ...updatedBlueprint, projectId: undefined } });
+          }
+          
+          toast({
+            title: "Blueprint Removed",
+            description: `"${blueprintName}" has been removed from the project.`,
+          });
+        } else {
+          throw new Error(response.message || 'Failed to remove blueprint from project');
+        }
+      } catch (error) {
+        console.error('❌ Error removing blueprint from project:', error);
+        toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : "Failed to remove blueprint from project.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
+
+  const projectBlueprints = state.blueprints.filter(bp => bp.projectId === projectId);
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-      <div className="flex h-[calc(100vh-4rem)]">
-        <Sidebar />
-        <main className="flex-1 p-6 overflow-auto">
+      <Sidebar />
+      <main className="ml-64 p-6">
           <div className="max-w-6xl mx-auto space-y-8">
             {/* Navigation */}
             <div className="flex items-center gap-4">
@@ -120,8 +154,10 @@ export function ProjectDetail() {
                 </div>
                 
                 <div className="text-right text-sm text-muted-foreground">
-                  <div>Created {format(new Date(project.createdDate), 'MMM d, yyyy')}</div>
+                                  <div>
+                  <div>Created {format(new Date(project.createdAt), 'MMM d, yyyy')}</div>
                   <div>{projectBlueprints.length} blueprint{projectBlueprints.length !== 1 ? 's' : ''}</div>
+                </div>
                 </div>
               </div>
             </div>
@@ -252,49 +288,77 @@ export function ProjectDetail() {
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {projectBlueprints.map((blueprint) => (
-                    <Link
-                      key={blueprint.id}
-                      to={`/blueprint/${blueprint.id}`}
-                      className="block"
-                    >
-                      <Card className="project-card h-full">
-                        <div className="aspect-video bg-muted rounded-lg mb-4 overflow-hidden">
-                          <img
-                            src={blueprint.imageUrl}
-                            alt={blueprint.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <CardContent className="p-4">
-                          <h3 className="text-lg font-semibold text-foreground mb-2">
-                            {blueprint.name}
-                          </h3>
-                          
-                          <div className="space-y-2 mb-4">
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <Calendar className="w-4 h-4" />
-                              <span>{format(new Date(blueprint.uploadDate), 'MMM d, yyyy')}</span>
-                            </div>
-                            
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <BarChart3 className="w-4 h-4" />
-                              <span>{blueprint.totalSymbols} symbols detected</span>
-                            </div>
+                    <div key={blueprint.id} className="relative">
+                      <Link
+                        to={`/projects/${projectId}/blueprints/${blueprint.id}`}
+                        className="block"
+                      >
+                        <Card className="project-card h-full">
+                          <div className="aspect-video bg-muted rounded-lg mb-4 overflow-hidden">
+                            <img
+                              src={blueprint.imageUrl}
+                              alt={blueprint.name}
+                              className="w-full h-full object-cover"
+                            />
                           </div>
+                          <CardContent className="p-4">
+                            <h3 className="text-lg font-semibold text-foreground mb-2">
+                              {blueprint.name}
+                            </h3>
+                            
+                            <div className="space-y-2 mb-4">
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Calendar className="w-4 h-4" />
+                                <span>{format(new Date(blueprint.uploadDate), 'MMM d, yyyy')}</span>
+                              </div>
+                              
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <BarChart3 className="w-4 h-4" />
+                                <span>{blueprint.totalSymbols} symbols detected</span>
+                              </div>
+                            </div>
 
-                          <Badge variant="secondary" className="text-xs">
-                            {Math.round(blueprint.averageAccuracy)}% accuracy
-                          </Badge>
-                        </CardContent>
-                      </Card>
-                    </Link>
+                            <Badge variant="secondary" className="text-xs">
+                              {Math.round(blueprint.averageAccuracy)}% accuracy
+                            </Badge>
+                          </CardContent>
+                        </Card>
+                      </Link>
+
+                      {/* Three-dot menu */}
+                      <div className="absolute top-4 right-4">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-secondary"
+                              onClick={(e) => e.preventDefault()}
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem 
+                              className="text-destructive focus:text-destructive"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleRemoveBlueprintFromProject(blueprint.id, blueprint.name);
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Remove from Project
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
             </div>
           </div>
         </main>
-      </div>
     </div>
   );
 }

@@ -8,15 +8,19 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { CheckCircle, Plus, X } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { Blueprint, Project } from '@/types';
+import { createProject, addBlueprintToProject } from '@/services/projectService';
+import { saveBlueprintToHistory } from '@/services/blueprintService';
+import { useToast } from '@/hooks/use-toast';
 
 interface SaveToProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
   blueprint: Blueprint | null;
+  originalFile?: File | null;
   onSaved: () => void;
 }
 
-export function SaveToProjectModal({ isOpen, onClose, blueprint, onSaved }: SaveToProjectModalProps) {
+export function SaveToProjectModal({ isOpen, onClose, blueprint, originalFile, onSaved }: SaveToProjectModalProps) {
   const [blueprintName, setBlueprintName] = useState(blueprint?.name || '');
   const [blueprintDescription, setBlueprintDescription] = useState(blueprint?.description || '');
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
@@ -24,57 +28,136 @@ export function SaveToProjectModal({ isOpen, onClose, blueprint, onSaved }: Save
   const [newProjectDescription, setNewProjectDescription] = useState('');
   const [showNewProject, setShowNewProject] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   
   const { state, dispatch } = useApp();
+  const { toast } = useToast();
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!blueprint) return;
 
-    let projectId = selectedProjectId;
+    setIsLoading(true);
 
-    // Create new project if needed
-    if (showNewProject && newProjectName) {
-      const newProject: Project = {
-        id: `project-${Date.now()}`,
-        name: newProjectName,
-        description: newProjectDescription,
-        createdDate: new Date(),
-        blueprints: []
-      };
-      
-      dispatch({ type: 'ADD_PROJECT', payload: newProject });
-      projectId = newProject.id;
-    }
+    try {
+      let projectId = selectedProjectId;
+      let savedBlueprint = blueprint;
 
-    // Update blueprint
-    const updatedBlueprint: Blueprint = {
-      ...blueprint,
-      name: blueprintName,
-      description: blueprintDescription,
-      projectId: projectId || undefined
-    };
-
-    dispatch({ type: 'UPDATE_BLUEPRINT', payload: updatedBlueprint });
-
-    // Update project's blueprints array
-    if (projectId) {
-      const project = state.projects.find(p => p.id === projectId);
-      if (project) {
-        const updatedProject: Project = {
-          ...project,
-          blueprints: [...project.blueprints, updatedBlueprint]
+      // Step 1: Save blueprint to backend if it doesn't have a proper server-generated ID
+      // Temporary IDs start with 'blueprint-' followed by timestamp, server IDs are MongoDB ObjectIds
+      if (blueprint.id.startsWith('blueprint-') || originalFile) {
+        console.log('💾 Saving blueprint to backend first...');
+        console.log('🔍 Blueprint ID:', blueprint.id);
+        console.log('🔍 Has original file:', !!originalFile);
+        
+        const blueprintData = {
+          ...blueprint,
+          name: blueprintName,
+          description: blueprintDescription
         };
-        dispatch({ type: 'UPDATE_PROJECT', payload: updatedProject });
+        
+        const saveResponse = await saveBlueprintToHistory(blueprintData, originalFile || undefined);
+        
+        if (saveResponse.success && saveResponse.data) {
+          savedBlueprint = {
+            ...blueprint,
+            id: saveResponse.data.id,
+            name: blueprintName,
+            description: blueprintDescription
+          };
+          
+          console.log('✅ Blueprint saved with new ID:', savedBlueprint.id);
+          
+          // Add to local state so it appears in history
+          dispatch({ type: 'ADD_BLUEPRINT', payload: savedBlueprint });
+        } else {
+          throw new Error(saveResponse.message || 'Failed to save blueprint');
+        }
       }
-    }
 
-    setSaved(true);
-    
-    setTimeout(() => {
-      setSaved(false);
-      onSaved();
-      onClose();
-    }, 1500);
+      // Step 2: Create new project if needed
+      if (showNewProject && newProjectName) {
+        console.log('📁 Creating new project for blueprint...');
+        
+        const projectResponse = await createProject({
+          name: newProjectName,
+          description: newProjectDescription
+        });
+
+        if (projectResponse.success && projectResponse.data) {
+          dispatch({ type: 'ADD_PROJECT', payload: projectResponse.data });
+          projectId = projectResponse.data.id;
+        } else {
+          throw new Error(projectResponse.message || 'Failed to create project');
+        }
+      }
+
+      // Step 3: Add blueprint to project
+      if (projectId) {
+        console.log('📎 Adding blueprint to project...');
+        
+        const linkResponse = await addBlueprintToProject(projectId, savedBlueprint.id);
+        
+        if (linkResponse.success) {
+          // Update blueprint in state
+          const updatedBlueprint: Blueprint = {
+            ...savedBlueprint,
+            projectId
+          };
+
+          dispatch({ type: 'UPDATE_BLUEPRINT', payload: updatedBlueprint });
+
+          // Also update the project to include the blueprint in its blueprints array
+          const currentProject = state.projects.find(p => p.id === projectId);
+          if (currentProject) {
+            const updatedProject: Project = {
+              ...currentProject,
+              blueprints: [...currentProject.blueprints, updatedBlueprint]
+            };
+            dispatch({ type: 'UPDATE_PROJECT', payload: updatedProject });
+          }
+
+          setSaved(true);
+          
+          toast({
+            title: "Blueprint Saved",
+            description: `"${blueprintName}" has been saved to the project.`,
+          });
+
+          setTimeout(() => {
+            setSaved(false);
+            resetForm();
+            onSaved();
+            onClose();
+          }, 1500);
+        } else {
+          throw new Error(linkResponse.message || 'Failed to add blueprint to project');
+        }
+      } else {
+        // If no project selected, just save the blueprint
+        setSaved(true);
+        
+        toast({
+          title: "Blueprint Saved",
+          description: `"${blueprintName}" has been saved to your history.`,
+        });
+
+        setTimeout(() => {
+          setSaved(false);
+          resetForm();
+          onSaved();
+          onClose();
+        }, 1500);
+      }
+    } catch (error) {
+      console.error('❌ Error saving blueprint:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save blueprint.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const resetForm = () => {
@@ -116,14 +199,9 @@ export function SaveToProjectModal({ isOpen, onClose, blueprint, onSaved }: Save
     }}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-xl font-semibold">
-              Save Blueprint
-            </DialogTitle>
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
+          <DialogTitle className="text-xl font-semibold">
+            Save Blueprint
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
@@ -225,9 +303,9 @@ export function SaveToProjectModal({ isOpen, onClose, blueprint, onSaved }: Save
             <Button 
               onClick={handleSave}
               className="btn-tech"
-              disabled={!blueprintName.trim()}
+              disabled={!blueprintName.trim() || isLoading}
             >
-              Save Blueprint
+              {isLoading ? 'Saving...' : 'Save Blueprint'}
             </Button>
           </div>
         </div>

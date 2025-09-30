@@ -1,12 +1,17 @@
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { AppState, Blueprint, Project, User } from '@/types';
-import { mockBlueprints, mockProjects } from '@/data/mockData';
 import { onAuthStateChange } from '@/services/authService';
+import { getUserBlueprints } from '@/services/blueprintService';
+import { getUserProjects } from '@/services/projectService';
 
 type AppAction = 
   | { type: 'LOGIN'; payload: User }
   | { type: 'LOGOUT' }
   | { type: 'SET_AUTH_LOADING'; payload: boolean }
+  | { type: 'SET_BLUEPRINTS'; payload: Blueprint[] }
+  | { type: 'SET_BLUEPRINTS_LOADING'; payload: boolean }
+  | { type: 'SET_PROJECTS'; payload: Project[] }
+  | { type: 'SET_PROJECTS_LOADING'; payload: boolean }
   | { type: 'ADD_BLUEPRINT'; payload: Blueprint }
   | { type: 'UPDATE_BLUEPRINT'; payload: Blueprint }
   | { type: 'DELETE_BLUEPRINT'; payload: string }
@@ -22,8 +27,8 @@ const initialState: AppState = {
     user: null,
     isLoading: true // Start with loading true for auth state check
   },
-  blueprints: mockBlueprints,
-  projects: mockProjects,
+  blueprints: [], // Start with empty array, load from API when authenticated
+  projects: [], // Start with empty array, load from API when authenticated
   currentBlueprint: null,
   currentProject: null
 };
@@ -34,8 +39,11 @@ const AppContext = createContext<{
 } | null>(null);
 
 function appReducer(state: AppState, action: AppAction): AppState {
+  console.log('🔄 App action dispatched:', action.type);
+  
   switch (action.type) {
     case 'LOGIN':
+      console.log('✅ LOGIN action - User:', action.payload);
       return {
         ...state,
         auth: {
@@ -46,6 +54,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
       };
     
     case 'LOGOUT':
+      console.log('🚪 LOGOUT action - Clearing auth state');
       return {
         ...state,
         auth: {
@@ -62,6 +71,32 @@ function appReducer(state: AppState, action: AppAction): AppState {
           ...state.auth,
           isLoading: action.payload
         }
+      };
+    
+    case 'SET_BLUEPRINTS':
+      console.log('📋 SET_BLUEPRINTS action - Blueprints:', action.payload.length);
+      return {
+        ...state,
+        blueprints: action.payload
+      };
+    
+    case 'SET_BLUEPRINTS_LOADING':
+      return {
+        ...state,
+        blueprintsLoading: action.payload
+      };
+    
+    case 'SET_PROJECTS':
+      console.log('📁 SET_PROJECTS action - Projects:', action.payload.length);
+      return {
+        ...state,
+        projects: action.payload
+      };
+    
+    case 'SET_PROJECTS_LOADING':
+      return {
+        ...state,
+        projectsLoading: action.payload
       };
     
     case 'ADD_BLUEPRINT':
@@ -124,13 +159,93 @@ function appReducer(state: AppState, action: AppAction): AppState {
 export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
+  // Debug function to check storage
+  const debugStorage = () => {
+    console.log('🔍 Debugging storage...');
+    console.log('localStorage length:', localStorage.length);
+    console.log('sessionStorage length:', sessionStorage.length);
+    
+    // Check for Firebase keys
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.includes('firebase') || key?.includes('auth')) {
+        console.log('🔑 Found auth key:', key, localStorage.getItem(key));
+      }
+    }
+  };
+
+  // Function to load user blueprints
+  const loadUserBlueprints = async () => {
+    try {
+      console.log('📋 Loading user blueprints...');
+      dispatch({ type: 'SET_BLUEPRINTS_LOADING', payload: true });
+      
+      const response = await getUserBlueprints();
+      if (response.success && response.data) {
+        console.log('📋 Loaded blueprints:', response.data);
+        dispatch({ type: 'SET_BLUEPRINTS', payload: response.data });
+      } else {
+        console.warn('📋 Failed to load blueprints:', response.message);
+        dispatch({ type: 'SET_BLUEPRINTS', payload: [] });
+      }
+    } catch (error) {
+      console.error('📋 Error loading blueprints:', error);
+      dispatch({ type: 'SET_BLUEPRINTS', payload: [] });
+    } finally {
+      dispatch({ type: 'SET_BLUEPRINTS_LOADING', payload: false });
+    }
+  };
+
+  // Function to load user projects
+  const loadUserProjects = async () => {
+    try {
+      console.log('📁 Loading user projects...');
+      dispatch({ type: 'SET_PROJECTS_LOADING', payload: true });
+      
+      const response = await getUserProjects();
+      if (response.success && response.data) {
+        console.log('📁 Loaded projects:', response.data);
+        dispatch({ type: 'SET_PROJECTS', payload: response.data });
+      } else {
+        console.warn('📁 Failed to load projects:', response.message);
+        dispatch({ type: 'SET_PROJECTS', payload: [] });
+      }
+    } catch (error) {
+      console.error('📁 Error loading projects:', error);
+      dispatch({ type: 'SET_PROJECTS', payload: [] });
+    } finally {
+      dispatch({ type: 'SET_PROJECTS_LOADING', payload: false });
+    }
+  };
+
   // Set up authentication state listener
   useEffect(() => {
-    const unsubscribe = onAuthStateChange((user) => {
+    console.log('🚀 App starting up...');
+    debugStorage();
+    
+    const unsubscribe = onAuthStateChange(async (user) => {
+      console.log('🔐 Auth state changed:', user ? 'User logged in' : 'User logged out');
+      console.log('🔐 User details:', user);
+      
       if (user) {
+        console.log('✅ User authenticated, loading data...');
         dispatch({ type: 'LOGIN', payload: user });
+        // Load user's data after login
+        await Promise.all([
+          loadUserBlueprints(),
+          loadUserProjects()
+        ]);
       } else {
-        dispatch({ type: 'SET_AUTH_LOADING', payload: false });
+        console.log('🚪 User logged out, clearing data...');
+        dispatch({ type: 'LOGOUT' });
+        // Clear data on logout
+        dispatch({ type: 'SET_BLUEPRINTS', payload: [] });
+        dispatch({ type: 'SET_PROJECTS', payload: [] });
+        
+        // Force a small delay to ensure state is updated before any redirects
+        setTimeout(() => {
+          console.log('🔄 Auth state cleanup completed');
+        }, 100);
       }
     });
 

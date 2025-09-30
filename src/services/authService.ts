@@ -105,15 +105,88 @@ export const signInWithGoogle = async (): Promise<User> => {
 // Sign out
 export const signOutUser = async (): Promise<void> => {
   try {
+    console.log('🚪 Starting logout process...');
+    
+    // Sign out from Firebase
     await signOut(auth);
+    
+    // Clear all local storage
+    localStorage.clear();
+    sessionStorage.clear();
+    
+    // Clear any browser caches
+    if ('caches' in window) {
+      const cacheNames = await caches.keys();
+      await Promise.all(
+        cacheNames.map(cacheName => caches.delete(cacheName))
+      );
+    }
+    
+    console.log('✅ Logout completed - all data cleared');
   } catch (error) {
+    console.error('❌ Logout error:', error);
     throw new Error(getAuthErrorMessage(error as AuthError));
+  }
+};
+
+// Force logout - more aggressive approach
+export const forceLogout = async (): Promise<void> => {
+  try {
+    console.log('💥 Force logout initiated...');
+    
+    // First sign out from Firebase
+    await signOut(auth);
+    
+    // Clear specific Firebase keys from localStorage
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.includes('firebase') || key.includes('auth'))) {
+        keysToRemove.push(key);
+      }
+    }
+    
+    // Remove Firebase keys specifically
+    keysToRemove.forEach(key => {
+      console.log('🗑️ Removing Firebase key:', key);
+      localStorage.removeItem(key);
+    });
+    
+    // Clear all storage
+    localStorage.clear();
+    sessionStorage.clear();
+    
+    // Clear browser data
+    if ('caches' in window) {
+      const cacheNames = await caches.keys();
+      await Promise.all(
+        cacheNames.map(cacheName => caches.delete(cacheName))
+      );
+    }
+    
+    console.log('✅ Force logout completed, reloading...');
+    
+    // Force reload the page to completely reset the app state
+    window.location.href = '/';
+    
+  } catch (error) {
+    console.error('❌ Force logout error:', error);
+    // Even if Firebase signOut fails, clear storage and force reload
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.href = '/';
   }
 };
 
 // Auth state listener
 export const onAuthStateChange = (callback: (user: User | null) => void) => {
   return onAuthStateChanged(auth, (firebaseUser) => {
+    console.log('🔄 Firebase auth state changed:', {
+      hasUser: !!firebaseUser,
+      uid: firebaseUser?.uid || 'N/A',
+      email: firebaseUser?.email || 'N/A'
+    });
+    
     if (firebaseUser) {
       callback(convertFirebaseUser(firebaseUser));
     } else {
@@ -125,5 +198,6 @@ export const onAuthStateChange = (callback: (user: User | null) => void) => {
 // Get current user
 export const getCurrentUser = (): User | null => {
   const firebaseUser = auth.currentUser;
+  console.log('🔍 getCurrentUser called, Firebase user:', firebaseUser?.uid || 'No user');
   return firebaseUser ? convertFirebaseUser(firebaseUser) : null;
 };

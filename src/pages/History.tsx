@@ -1,15 +1,44 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Header } from '@/components/Layout/Header';
 import { Sidebar } from '@/components/Layout/Sidebar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { useApp } from '@/context/AppContext';
-import { Calendar, FileImage, BarChart3 } from 'lucide-react';
+import { Calendar, FileImage, BarChart3, MoreVertical, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { deleteBlueprint } from '@/services/blueprintService';
+import { useToast } from '@/hooks/use-toast';
 
 export function History() {
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
+  const { toast } = useToast();
+
+  const handleDeleteBlueprint = async (blueprintId: string, blueprintName: string) => {
+    if (confirm(`Are you sure you want to delete "${blueprintName}"? This action cannot be undone.`)) {
+      try {
+        const response = await deleteBlueprint(blueprintId);
+        
+        if (response.success) {
+          dispatch({ type: 'DELETE_BLUEPRINT', payload: blueprintId });
+          toast({
+            title: "Blueprint Deleted",
+            description: `"${blueprintName}" has been deleted successfully.`,
+          });
+        } else {
+          throw new Error(response.message || 'Failed to delete blueprint');
+        }
+      } catch (error) {
+        console.error('❌ Error deleting blueprint:', error);
+        toast({
+          title: "Error",
+          description: error instanceof Error ? error.message : "Failed to delete blueprint.",
+          variant: "destructive",
+        });
+      }
+    }
+  };
 
   // Sort blueprints by upload date (newest first)
   const sortedBlueprints = useMemo(() => {
@@ -37,10 +66,8 @@ export function History() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
-      <div className="flex h-[calc(100vh-4rem)]">
-        <Sidebar />
-        <main className="flex-1 p-6 overflow-auto">
+      <Sidebar />
+      <main className="ml-64 p-6">
           <div className="max-w-6xl mx-auto space-y-8">
             <div>
               <h1 className="text-3xl font-bold text-foreground mb-2">
@@ -59,50 +86,79 @@ export function History() {
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {recentBlueprints.map((blueprint) => (
-                    <Link
-                      key={blueprint.id}
-                      to={`/blueprint/${blueprint.id}`}
-                      className="block"
-                    >
-                      <Card className="project-card h-full">
-                        <div className="aspect-video bg-muted rounded-lg mb-4 overflow-hidden">
-                          <img
-                            src={blueprint.imageUrl}
-                            alt={blueprint.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <CardContent className="p-0">
-                          <h3 className="text-lg font-semibold text-foreground mb-2">
-                            {blueprint.name}
-                          </h3>
-                          
-                          <div className="space-y-2 mb-4">
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <Calendar className="w-4 h-4" />
-                              <span>{format(new Date(blueprint.uploadDate), 'MMM d, yyyy')}</span>
-                            </div>
-                            
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <BarChart3 className="w-4 h-4" />
-                              <span>{blueprint.totalSymbols} symbols detected</span>
-                            </div>
+                    <div key={blueprint.id} className="relative">
+                      <Link
+                        to={`/history/blueprints/${blueprint.id}`}
+                        className="block"
+                      >
+                        <Card className="project-card h-full">
+                          <div className="aspect-video bg-muted rounded-lg mb-4 overflow-hidden">
+                            <img
+                              src={blueprint.imageUrl}
+                              alt={blueprint.name}
+                              className="w-full h-full object-cover"
+                            />
                           </div>
+                          <CardContent className="p-0">
+                            <h3 className="text-lg font-semibold text-foreground mb-2">
+                              {blueprint.name}
+                            </h3>
+                            
+                            <div className="space-y-2 mb-4">
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Calendar className="w-4 h-4" />
+                                <span>{format(new Date(blueprint.uploadDate), 'MMM d, yyyy')}</span>
+                              </div>
+                              
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <BarChart3 className="w-4 h-4" />
+                                <span>{blueprint.totalSymbols} symbols detected</span>
+                              </div>
+                            </div>
 
-                          <div className="flex items-center justify-between">
-                            <Badge variant="secondary" className="text-xs">
-                              {Math.round(blueprint.averageAccuracy)}% accuracy
-                            </Badge>
-                            
-                            {blueprint.projectId && (
-                              <Badge variant="outline" className="text-xs">
-                                {getProjectName(blueprint.projectId)}
+                            <div className="flex items-center justify-between">
+                              <Badge variant="secondary" className="text-xs">
+                                {Math.round(blueprint.averageAccuracy)}% accuracy
                               </Badge>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </Link>
+                              
+                              {blueprint.projectId && (
+                                <Badge variant="outline" className="text-xs">
+                                  {getProjectName(blueprint.projectId)}
+                                </Badge>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </Link>
+
+                      {/* Three-dot menu */}
+                      <div className="absolute top-4 right-4">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-secondary"
+                              onClick={(e) => e.preventDefault()}
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem 
+                              className="text-destructive focus:text-destructive"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleDeleteBlueprint(blueprint.id, blueprint.name);
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete Blueprint
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -129,68 +185,96 @@ export function History() {
               ) : (
                 <div className="space-y-4">
                   {last30DaysBlueprints.map((blueprint) => (
-                    <Link
-                      key={blueprint.id}
-                      to={`/blueprint/${blueprint.id}`}
-                      className="block"
-                    >
-                      <Card className="hover:shadow-medium hover:scale-[1.01] transition-all duration-200">
-                        <CardContent className="p-6">
-                          <div className="flex items-start gap-4">
-                            <div className="w-20 h-16 bg-muted rounded-lg overflow-hidden flex-shrink-0">
-                              <img
-                                src={blueprint.imageUrl}
-                                alt={blueprint.name}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between mb-2">
-                                <h3 className="text-lg font-semibold text-foreground truncate">
-                                  {blueprint.name}
-                                </h3>
-                                <div className="flex items-center gap-2 ml-4">
-                                  <Badge variant="secondary" className="text-xs">
-                                    {Math.round(blueprint.averageAccuracy)}% accuracy
-                                  </Badge>
-                                  {blueprint.projectId && (
-                                    <Badge variant="outline" className="text-xs">
-                                      {getProjectName(blueprint.projectId)}
-                                    </Badge>
-                                  )}
-                                </div>
+                    <div key={blueprint.id} className="relative">
+                      <Link
+                        to={`/history/blueprints/${blueprint.id}`}
+                        className="block"
+                      >
+                        <Card className="hover:shadow-medium hover:scale-[1.01] transition-all duration-200">
+                          <CardContent className="p-6">
+                            <div className="flex items-start gap-4">
+                              <div className="w-20 h-16 bg-muted rounded-lg overflow-hidden flex-shrink-0">
+                                <img
+                                  src={blueprint.imageUrl}
+                                  alt={blueprint.name}
+                                  className="w-full h-full object-cover"
+                                />
                               </div>
                               
-                              {blueprint.description && (
-                                <p className="text-muted-foreground text-sm mb-3 line-clamp-2">
-                                  {blueprint.description}
-                                </p>
-                              )}
-                              
-                              <div className="flex items-center gap-6 text-sm text-muted-foreground">
-                                <div className="flex items-center gap-2">
-                                  <Calendar className="w-4 h-4" />
-                                  <span>{format(new Date(blueprint.uploadDate), 'MMM d, yyyy')}</span>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between mb-2">
+                                  <h3 className="text-lg font-semibold text-foreground truncate">
+                                    {blueprint.name}
+                                  </h3>
+                                  <div className="flex items-center gap-2 ml-4">
+                                    <Badge variant="secondary" className="text-xs">
+                                      {Math.round(blueprint.averageAccuracy)}% accuracy
+                                    </Badge>
+                                    {blueprint.projectId && (
+                                      <Badge variant="outline" className="text-xs">
+                                        {getProjectName(blueprint.projectId)}
+                                      </Badge>
+                                    )}
+                                  </div>
                                 </div>
                                 
-                                <div className="flex items-center gap-2">
-                                  <BarChart3 className="w-4 h-4" />
-                                  <span>{blueprint.totalSymbols} symbols</span>
+                                {blueprint.description && (
+                                  <p className="text-muted-foreground text-sm mb-3 line-clamp-2">
+                                    {blueprint.description}
+                                  </p>
+                                )}
+                                
+                                <div className="flex items-center gap-6 text-sm text-muted-foreground">
+                                  <div className="flex items-center gap-2">
+                                    <Calendar className="w-4 h-4" />
+                                    <span>{format(new Date(blueprint.uploadDate), 'MMM d, yyyy')}</span>
+                                  </div>
+                                  
+                                  <div className="flex items-center gap-2">
+                                    <BarChart3 className="w-4 h-4" />
+                                    <span>{blueprint.totalSymbols} symbols</span>
+                                  </div>
                                 </div>
                               </div>
                             </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </Link>
+                          </CardContent>
+                        </Card>
+                      </Link>
+
+                      {/* Three-dot menu */}
+                      <div className="absolute top-4 right-4">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 w-8 p-0 hover:bg-secondary"
+                              onClick={(e) => e.preventDefault()}
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem 
+                              className="text-destructive focus:text-destructive"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                handleDeleteBlueprint(blueprint.id, blueprint.name);
+                              }}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete Blueprint
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
             </div>
           </div>
         </main>
-      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import multer from 'multer';
 import { Blueprint } from '../models/Blueprint';
+import { User } from '../models/User';
 import { uploadToS3, deleteFromS3, validateS3Config } from '../services/s3Service';
 import sharp from 'sharp';
 
@@ -19,6 +20,33 @@ export const upload = multer({
     }
   },
 });
+
+/**
+ * Helper function to get user ObjectId from Firebase UID
+ * Creates user if it doesn't exist
+ */
+async function getUserObjectId(firebaseUid: string, userInfo?: { email?: string; name?: string }) {
+  // Try to find existing user
+  let user = await User.findOne({ firebaseUid });
+  
+  if (!user) {
+    // Create new user if doesn't exist
+    user = new User({
+      firebaseUid,
+      email: userInfo?.email || '',
+      name: userInfo?.name || userInfo?.email || 'User',
+      lastLoginAt: new Date()
+    });
+    await user.save();
+    console.log('🆕 Created new user for Firebase UID:', firebaseUid);
+  } else {
+    // Update last login time for existing user
+    user.lastLoginAt = new Date();
+    await user.save();
+  }
+  
+  return user._id;
+}
 
 /**
  * Upload a blueprint image
@@ -41,14 +69,20 @@ export async function uploadBlueprint(req: Request, res: Response) {
     }
 
     const { name, description, projectId } = req.body;
-    const userId = req.user?.uid; // From auth middleware
+    const firebaseUid = req.user?.uid; // From auth middleware
 
-    if (!userId) {
+    if (!firebaseUid) {
       return res.status(401).json({
         success: false,
         message: 'User not authenticated'
       });
     }
+
+    // Get the user ObjectId from Firebase UID (creates user if needed)
+    const userObjectId = await getUserObjectId(firebaseUid, {
+      email: req.user?.email,
+      name: req.user?.name
+    });
 
     // Get image metadata using Sharp
     const metadata = await sharp(req.file.buffer).metadata();
@@ -75,7 +109,7 @@ export async function uploadBlueprint(req: Request, res: Response) {
       imageUrl: uploadResult.url,
       s3Key: uploadResult.key,
       originalFilename: req.file.originalname,
-      userId,
+      userId: userObjectId, // Use the MongoDB ObjectId from the helper
       projectId: projectId || null,
       symbols: [],
       status: 'processing',
@@ -116,16 +150,20 @@ export async function uploadBlueprint(req: Request, res: Response) {
 export async function deleteBlueprint(req: Request, res: Response) {
   try {
     const { id } = req.params;
-    const userId = req.user?.uid;
+    const firebaseUid = req.user?.uid;
 
-    if (!userId) {
+    if (!firebaseUid) {
       return res.status(401).json({
         success: false,
         message: 'User not authenticated'
       });
     }
 
-    const blueprint = await Blueprint.findOne({ _id: id, userId });
+    const userObjectId = await getUserObjectId(firebaseUid, {
+      email: req.user?.email,
+      name: req.user?.name
+    });
+    const blueprint = await Blueprint.findOne({ _id: id, userId: userObjectId });
 
     if (!blueprint) {
       return res.status(404).json({
@@ -162,19 +200,23 @@ export async function deleteBlueprint(req: Request, res: Response) {
  */
 export async function getUserBlueprints(req: Request, res: Response) {
   try {
-    const userId = req.user?.uid;
+    const firebaseUid = req.user?.uid;
 
-    if (!userId) {
+    if (!firebaseUid) {
       return res.status(401).json({
         success: false,
         message: 'User not authenticated'
       });
     }
 
+    const userObjectId = await getUserObjectId(firebaseUid, {
+      email: req.user?.email,
+      name: req.user?.name
+    });
     const { projectId, status, page = 1, limit = 20 } = req.query;
     
     // Build filter
-    const filter: any = { userId };
+    const filter: any = { userId: userObjectId };
     if (projectId) filter.projectId = projectId;
     if (status) filter.status = status;
 
@@ -216,17 +258,21 @@ export async function getUserBlueprints(req: Request, res: Response) {
 export async function getBlueprintById(req: Request, res: Response) {
   try {
     const { id } = req.params;
-    const userId = req.user?.uid;
+    const firebaseUid = req.user?.uid;
 
-    if (!userId) {
+    if (!firebaseUid) {
       return res.status(401).json({
         success: false,
         message: 'User not authenticated'
       });
     }
 
+    const userObjectId = await getUserObjectId(firebaseUid, {
+      email: req.user?.email,
+      name: req.user?.name
+    });
     const blueprint = await Blueprint
-      .findOne({ _id: id, userId })
+      .findOne({ _id: id, userId: userObjectId })
       .populate('projectId', 'name description');
 
     if (!blueprint) {
