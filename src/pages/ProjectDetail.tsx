@@ -154,16 +154,14 @@ export function ProjectDetail() {
   // Upload handler
   const handleBlueprintUploaded = async (blueprint: Blueprint) => {
     try {
-      const response = await addBlueprintToProject(projectId!, blueprint.id);
-      if (response.success) {
-        const updatedBlueprint = { ...blueprint, projectId };
-        const exists = state.blueprints.find(bp => bp.id === blueprint.id);
-        dispatch({ type: exists ? 'UPDATE_BLUEPRINT' : 'ADD_BLUEPRINT', payload: updatedBlueprint });
-        toast({ title: "Blueprint Added", description: `"${blueprint.name}" has been added to the project.` });
-        setShowUpload(false);
-      }
+      // Blueprint is already uploaded and assigned to project, just update local state
+      const exists = state.blueprints.find(bp => bp.id === blueprint.id);
+      dispatch({ type: exists ? 'UPDATE_BLUEPRINT' : 'ADD_BLUEPRINT', payload: blueprint });
+      toast({ title: "Blueprint Added", description: `"${blueprint.name}" has been added to the project.` });
+      setShowUpload(false);
     } catch (error) {
-      toast({ title: "Error", description: "Failed to add blueprint to project.", variant: "destructive" });
+      console.error('Error handling uploaded blueprint:', error);
+      toast({ title: "Error", description: "Failed to process uploaded blueprint.", variant: "destructive" });
       setShowUpload(false);
     }
   };
@@ -250,7 +248,7 @@ export function ProjectDetail() {
                       <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
                       <span className="text-sm font-medium text-primary">Uploading to {project.name}</span>
                     </div>
-                    <UploadArea onBlueprintUploaded={handleBlueprintUploaded} isProcessing={isProcessing} setIsProcessing={setIsProcessing} />
+                    <UploadArea onBlueprintUploaded={handleBlueprintUploaded} isProcessing={isProcessing} setIsProcessing={setIsProcessing} projectId={projectId} />
                   </div>
                   <Button variant="outline" onClick={() => setShowUpload(false)} disabled={isProcessing}>Cancel Upload</Button>
                 </div>

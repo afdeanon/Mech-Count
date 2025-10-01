@@ -3,6 +3,7 @@ import multer from 'multer';
 import mongoose from 'mongoose';
 import { Blueprint } from '../models/Blueprint';
 import { User } from '../models/User';
+import { Project } from '../models/Project';
 import { AIUsage } from '../models/AIUsage';
 import { uploadToS3, deleteFromS3, validateS3Config } from '../services/s3Service';
 import { analyzeBlueprint, validateImageForAnalysis, getAnalysisCost } from '../services/aiService';
@@ -133,6 +134,29 @@ export async function uploadBlueprint(req: Request, res: Response) {
     console.log(`📝 [DEBUG] - Blueprint _id: ${blueprint._id}`);
     console.log(`📝 [DEBUG] - Blueprint name: ${blueprint.name}`);
     console.log(`📝 [DEBUG] - Blueprint userId: ${blueprint.userId}`);
+    console.log(`📝 [DEBUG] - Blueprint projectId: ${blueprint.projectId}`);
+
+    // If projectId is provided, add blueprint to project's blueprintIds array
+    if (projectId) {
+      try {
+        const project = await Project.findOne({ _id: projectId, userId: userObjectId });
+        if (project) {
+          const blueprintObjectId = blueprint._id as mongoose.Types.ObjectId;
+          if (!project.blueprintIds.some(id => id.equals(blueprintObjectId))) {
+            project.blueprintIds.push(blueprintObjectId);
+            await project.save();
+            console.log(`📎 [DEBUG] Added blueprint ${blueprint._id} to project ${projectId}`);
+          } else {
+            console.log(`📎 [DEBUG] Blueprint ${blueprint._id} already in project ${projectId}`);
+          }
+        } else {
+          console.log(`⚠️ [DEBUG] Project ${projectId} not found or doesn't belong to user`);
+        }
+      } catch (projectError) {
+        console.error('Error adding blueprint to project:', projectError);
+        // Don't fail the entire upload if project linking fails
+      }
+    }
 
     // Start AI analysis in the background
     processAIAnalysis((blueprint._id as mongoose.Types.ObjectId).toString(), req.file.buffer, req.file.mimetype, userObjectId)

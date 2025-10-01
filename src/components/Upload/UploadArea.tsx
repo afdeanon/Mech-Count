@@ -10,9 +10,10 @@ interface UploadAreaProps {
   onBlueprintUploaded: (blueprint: Blueprint, file?: File) => void;
   isProcessing: boolean;
   setIsProcessing: (processing: boolean) => void;
+  projectId?: string; // Optional project ID to assign blueprint to
 }
 
-export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing }: UploadAreaProps) {
+export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing, projectId }: UploadAreaProps) {
   const [progress, setProgress] = useState(0);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
@@ -46,27 +47,43 @@ export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing 
 
       setProgress(30);
 
-      // Step 2: Create local blueprint from file (session-only)
-      const blueprint: Blueprint = {
-        id: `temp-${Date.now()}`, // Temporary ID for session
-        name: file.name.replace(/\.[^/.]+$/, ''),
-        description: '',
-        imageUrl: URL.createObjectURL(file), // Create local URL for preview
-        uploadDate: new Date(),
-        symbols: [],
-        totalSymbols: 0,
-        averageAccuracy: 0,
-        status: 'processing',
-        aiAnalysis: {
-          isAnalyzed: false,
-          confidence: 0,
-          summary: 'Ready to save'
-        }
-      };
+      // Step 2: Upload to backend with project assignment
+      console.log('📤 Uploading blueprint to backend...', { projectId });
+      const uploadResult = await uploadBlueprint(
+        file,
+        file.name.replace(/\.[^/.]+$/, ''), // Remove file extension for name
+        '', // Empty description for now
+        projectId // Pass project ID if provided
+      );
+
+      if (!uploadResult.success) {
+        throw new Error(uploadResult.message || 'Upload failed');
+      }
 
       setProgress(70);
 
-      // Step 3: Pass blueprint to parent for display (local state only)
+      // Step 3: Create blueprint object from response
+      const blueprint: Blueprint = {
+        id: uploadResult.data._id || uploadResult.data.id,
+        name: uploadResult.data.name || file.name.replace(/\.[^/.]+$/, ''),
+        description: uploadResult.data.description || '',
+        imageUrl: uploadResult.data.imageUrl || URL.createObjectURL(file),
+        uploadDate: new Date(uploadResult.data.uploadDate || uploadResult.data.createdAt),
+        symbols: uploadResult.data.symbols || [],
+        totalSymbols: uploadResult.data.totalSymbols || 0,
+        averageAccuracy: uploadResult.data.averageAccuracy || 0,
+        status: uploadResult.data.status || 'completed',
+        projectId: projectId, // Assign to project if provided
+        aiAnalysis: uploadResult.data.aiAnalysis || {
+          isAnalyzed: true,
+          confidence: uploadResult.data.averageAccuracy || 0,
+          summary: 'Blueprint uploaded successfully'
+        }
+      };
+
+      setProgress(90);
+
+      // Step 4: Pass blueprint to parent
       onBlueprintUploaded(blueprint, file);
 
       setProgress(90);
@@ -122,7 +139,7 @@ export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing 
             Processing Blueprint
           </h3>
           <p className="text-muted-foreground mb-6">
-            Preparing your blueprint for preview...
+            {projectId ? 'Uploading and assigning to project...' : 'Uploading your blueprint...'}
           </p>
           
           <div className="max-w-md mx-auto space-y-3">
@@ -209,7 +226,9 @@ export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing 
             <p className="text-muted-foreground mb-4">
               {isDragReject
                 ? 'Please upload image files (PNG, JPG, JPEG, BMP, TIFF) or PDF documents'
-                : 'Upload your blueprint for AI-powered symbol detection and analysis'
+                : projectId 
+                  ? 'Upload your blueprint and automatically assign it to this project'
+                  : 'Upload your blueprint for AI-powered symbol detection and analysis'
               }
             </p>
             
