@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { Upload, History, FolderOpen, FileText, LogOut, ChevronUp, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useApp } from '@/context/AppContext';
-import { forceLogout } from '@/services/authService';
+import { signOutUser } from '@/services/authService';
 import { cn } from '@/lib/utils';
 
 const navigation = [
@@ -31,11 +31,9 @@ export function Sidebar() {
   const handleLogout = async () => {
     try {
       console.log('🚪 Sidebar logout clicked');
-      await forceLogout();
+      await signOutUser();
     } catch (error) {
       console.error('❌ Sidebar logout error:', error);
-      // Fallback: force reload anyway
-      window.location.href = '/';
     }
   };
 

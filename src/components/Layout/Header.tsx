@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Settings, FileText, LogOut } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
-import { forceLogout } from '@/services/authService';
+import { signOutUser } from '@/services/authService';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 
@@ -19,7 +19,7 @@ export function Header({ showAuthButtons, onLoginClick, onSignUpClick }: HeaderP
   const handleLogout = async () => {
     try {
       console.log('🚪 Logout button clicked');
-      await forceLogout();
+      await signOutUser();
       
       toast({
         title: "Logged out",

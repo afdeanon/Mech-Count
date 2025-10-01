@@ -164,17 +164,15 @@ export const forceLogout = async (): Promise<void> => {
       );
     }
     
-    console.log('✅ Force logout completed, reloading...');
-    
-    // Force reload the page to completely reset the app state
-    window.location.href = '/';
+    console.log('✅ Force logout completed');
+    // Let React Router handle the navigation via auth state change
     
   } catch (error) {
     console.error('❌ Force logout error:', error);
-    // Even if Firebase signOut fails, clear storage and force reload
+    // Even if Firebase signOut fails, clear storage
     localStorage.clear();
     sessionStorage.clear();
-    window.location.href = '/';
+    // Let the app handle the redirect naturally
   }
 };
 

@@ -20,7 +20,7 @@ function AppRoutes() {
   // Show loading or prevent redirects while auth state is being determined
   if (state.auth.isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading...</p>
@@ -30,73 +30,75 @@ function AppRoutes() {
   }
 
   return (
-    <Routes>
-      <Route 
-        path="/" 
-        element={
-          state.auth.isAuthenticated ? 
-          <Navigate to="/dashboard" replace /> : 
-          <Landing />
-        } 
-      />
-      <Route 
-        path="/dashboard" 
-        element={
-          state.auth.isAuthenticated ? 
-          <Dashboard /> : 
-          <Navigate to="/" replace />
-        } 
-      />
-      <Route 
-        path="/upload-blueprint" 
-        element={
-          state.auth.isAuthenticated ? 
-          <Dashboard /> : 
-          <Navigate to="/" replace />
-        } 
-      />
-      <Route 
-        path="/history/blueprints" 
-        element={
-          state.auth.isAuthenticated ? 
-          <History /> : 
-          <Navigate to="/" replace />
-        } 
-      />
-      <Route 
-        path="/projects" 
-        element={
-          state.auth.isAuthenticated ? 
-          <Projects /> : 
-          <Navigate to="/" replace />
-        } 
-      />
-      <Route 
-        path="/projects/:projectId" 
-        element={
-          state.auth.isAuthenticated ? 
-          <ProjectDetail /> : 
-          <Navigate to="/" replace />
-        } 
-      />
-      <Route 
-        path="/projects/:projectId/blueprints/:blueprintId" 
-        element={
-          state.auth.isAuthenticated ? 
-          <BlueprintDetail /> : 
-          <Navigate to="/" replace />
-        } 
-      />
-      <Route 
-        path="/history/blueprints/:blueprintId" 
-        element={
-          state.auth.isAuthenticated ? 
-          <BlueprintDetail /> : 
-          <Navigate to="/" replace />
-        } 
-      />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <div className="animate-in fade-in-0 duration-300">
+      <Routes>
+        <Route 
+          path="/" 
+          element={
+            state.auth.isAuthenticated ? 
+            <Navigate to="/dashboard" replace /> : 
+            <Landing />
+          } 
+        />
+        <Route 
+          path="/dashboard" 
+          element={
+            state.auth.isAuthenticated ? 
+            <Dashboard /> : 
+            <Navigate to="/" replace />
+          } 
+        />
+        <Route 
+          path="/upload-blueprint" 
+          element={
+            state.auth.isAuthenticated ? 
+            <Dashboard /> : 
+            <Navigate to="/" replace />
+          } 
+        />
+        <Route 
+          path="/history/blueprints" 
+          element={
+            state.auth.isAuthenticated ? 
+            <History /> : 
+            <Navigate to="/" replace />
+          } 
+        />
+        <Route 
+          path="/projects" 
+          element={
+            state.auth.isAuthenticated ? 
+            <Projects /> : 
+            <Navigate to="/" replace />
+          } 
+        />
+        <Route 
+          path="/projects/:projectId" 
+          element={
+            state.auth.isAuthenticated ? 
+            <ProjectDetail /> : 
+            <Navigate to="/" replace />
+          } 
+        />
+        <Route 
+          path="/projects/:projectId/blueprints/:blueprintId" 
+          element={
+            state.auth.isAuthenticated ? 
+            <BlueprintDetail /> : 
+            <Navigate to="/" replace />
+          } 
+        />
+        <Route 
+          path="/history/blueprints/:blueprintId" 
+          element={
+            state.auth.isAuthenticated ? 
+            <BlueprintDetail /> : 
+            <Navigate to="/" replace />
+          } 
+        />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </div>
   );
 }
 

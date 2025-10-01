@@ -228,12 +228,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       } else {
         console.log('🚪 User logged out, clearing data...');
         dispatch({ type: 'LOGOUT' });
-        // Clear data on logout
-        dispatch({ type: 'SET_BLUEPRINTS', payload: [] });
-        dispatch({ type: 'SET_PROJECTS', payload: [] });
         
-        // Force a small delay to ensure state is updated before any redirects
+        // Clear data on logout with a small delay for smooth transition
         setTimeout(() => {
+          dispatch({ type: 'SET_BLUEPRINTS', payload: [] });
+          dispatch({ type: 'SET_PROJECTS', payload: [] });
           console.log('🔄 Auth state cleanup completed');
         }, 100);
       }
