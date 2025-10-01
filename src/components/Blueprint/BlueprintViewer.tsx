@@ -3,7 +3,7 @@ import { ZoomIn, ZoomOut, RotateCcw, Move, Brain, Clock, CheckCircle, XCircle, A
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Blueprint } from '@/types';
-import { symbolTypes } from '@/data/mockData';
+import { EnhancedSymbolAnalysis } from '@/components/AI/EnhancedSymbolAnalysis';
 
 interface BlueprintViewerProps {
   blueprint: Blueprint;
@@ -146,92 +146,48 @@ export function BlueprintViewer({ blueprint, showSymbols = true }: BlueprintView
           />
 
           {/* Symbol Overlays */}
-          {showSymbols && blueprint.symbols.map((symbol) => (
-            <div
-              key={symbol.id}
-              className="absolute border-2 bg-opacity-20 rounded-sm hover:bg-opacity-30 transition-all duration-200"
-              style={{
-                left: symbol.position.x,
-                top: symbol.position.y,
-                width: symbol.position.width,
-                height: symbol.position.height,
-                borderColor: getSymbolColor(symbol.category || 'other'),
-                backgroundColor: getSymbolColor(symbol.category || 'other') + '33'
-              }}
-              title={`${symbol.name}${symbol.description ? ': ' + symbol.description : ''} (${Math.round(symbol.confidence * 100)}% confidence)`}
-            >
+          {showSymbols && blueprint.symbols.map((symbol) => {
+            console.log('🎯 Rendering symbol:', {
+              id: symbol.id,
+              name: symbol.name,
+              position: symbol.position,
+              category: symbol.category,
+              confidence: symbol.confidence
+            });
+            
+            return (
               <div
-                className="text-xs font-mono text-white px-1 py-0.5 rounded-tl"
-                style={{ backgroundColor: getSymbolColor(symbol.category || 'other') }}
+                key={symbol.id}
+                className="absolute border-2 bg-opacity-20 rounded-sm hover:bg-opacity-30 transition-all duration-200"
+                style={{
+                  left: symbol.position.x,
+                  top: symbol.position.y,
+                  width: symbol.position.width,
+                  height: symbol.position.height,
+                  borderColor: getSymbolColor(symbol.category || 'other'),
+                  backgroundColor: getSymbolColor(symbol.category || 'other') + '33'
+                }}
+                title={`${symbol.name}${symbol.description ? ': ' + symbol.description : ''} (${Math.round(symbol.confidence * 100)}% confidence)`}
               >
-                {Math.round(symbol.confidence * 100)}%
+                <div
+                  className="text-xs font-mono text-white px-1 py-0.5 rounded-tl"
+                  style={{ backgroundColor: getSymbolColor(symbol.category || 'other') }}
+                >
+                  {Math.round(symbol.confidence * 100)}%
+                </div>
+                <div className="text-xs text-gray-800 px-1 py-0.5 bg-white bg-opacity-90 rounded-br max-w-20 truncate">
+                  {symbol.name}
+                </div>
               </div>
-              <div className="text-xs text-gray-800 px-1 py-0.5 bg-white bg-opacity-90 rounded-br max-w-20 truncate">
-                {symbol.name}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
       {/* AI Analysis Results */}
-      {showSymbols && (
-        <div className="mt-4 space-y-4">
-          {/* AI Summary */}
-          {blueprint.aiAnalysis?.summary && (
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-center gap-2 mb-2">
-                <Brain className="w-4 h-4 text-blue-600" />
-                <h4 className="font-medium text-blue-900">AI Analysis Summary</h4>
-              </div>
-              <p className="text-sm text-blue-800">{blueprint.aiAnalysis.summary}</p>
-              {blueprint.aiAnalysis.processingTime && (
-                <p className="text-xs text-blue-600 mt-1">
-                  Analysis completed in {blueprint.aiAnalysis.processingTime}ms
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Symbol Categories */}
-          <div className="p-4 bg-muted/30 rounded-lg">
-            <h4 className="font-medium mb-3">Detected Symbols by Category</h4>
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-              {['hydraulic', 'pneumatic', 'mechanical', 'electrical', 'other'].map((category) => {
-                const categorySymbols = blueprint.symbols.filter(s => s.category === category);
-                if (categorySymbols.length === 0) return null;
-                
-                return (
-                  <div key={category} className="flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded-sm"
-                      style={{ backgroundColor: getSymbolColor(category) }}
-                    />
-                    <span className="text-sm capitalize">
-                      {category}: {categorySymbols.length}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-            
-            {/* Symbol Details */}
-            {blueprint.symbols.length > 0 && (
-              <div className="mt-4 pt-3 border-t border-muted">
-                <h5 className="text-sm font-medium mb-2">Symbol Details</h5>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-32 overflow-y-auto">
-                  {blueprint.symbols.map((symbol) => (
-                    <div key={symbol.id} className="flex items-center justify-between text-xs p-2 bg-background/50 rounded">
-                      <span className="font-medium">{symbol.name}</span>
-                      <Badge variant="outline" className="text-xs">
-                        {Math.round(symbol.confidence * 100)}%
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+      {showSymbols && blueprint.symbols.length > 0 && (
+        <div className="mt-6">
+          <EnhancedSymbolAnalysis blueprint={blueprint} />
         </div>
       )}
     </div>

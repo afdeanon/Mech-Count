@@ -3,11 +3,12 @@ import { Sidebar } from '@/components/Layout/Sidebar';
 import { UploadArea } from '@/components/Upload/UploadArea';
 import { BlueprintViewer } from '@/components/Blueprint/BlueprintViewer';
 import { SymbolAnalysis } from '@/components/Blueprint/SymbolAnalysis';
-import { SaveToProjectModal } from '@/components/Project/SaveToProjectModal';
+import {SaveToProjectModal } from '@/components/Project/SaveToProjectModal';
+import { AITestPanel } from '@/components/AI/AITestPanel';
 import { Button } from '@/components/ui/button';
 import { Blueprint } from '@/types';
-import { deleteBlueprint } from '@/services/blueprintService';
-import { Save, Upload } from 'lucide-react';
+import { deleteBlueprint, getBlueprintById } from '@/services/blueprintService';
+import { Save, Upload, Brain, FileImage, RefreshCw } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,10 +24,83 @@ export function Dashboard() {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [isPollingForUpdates, setIsPollingForUpdates] = useState(false);
 
   // Use LOCAL state for uploaded blueprints in this session only
   const [uploadedBlueprint, setUploadedBlueprint] = useState<Blueprint | null>(null);
   const [originalFile, setOriginalFile] = useState<File | null>(null);
+
+  // Poll for blueprint updates when status is 'processing'
+  useEffect(() => {
+    if (!uploadedBlueprint || uploadedBlueprint.status !== 'processing') {
+      setIsPollingForUpdates(false);
+      return;
+    }
+
+    setIsPollingForUpdates(true);
+    console.log('🔄 Starting to poll for blueprint updates...', uploadedBlueprint.id);
+
+    const pollInterval = setInterval(async () => {
+      try {
+        console.log('🔄 Polling for blueprint updates...', uploadedBlueprint.id);
+        const result = await getBlueprintById(uploadedBlueprint.id);
+        
+        if (result.success && result.data) {
+          const updatedBlueprint = result.data;
+          console.log('📋 Received updated blueprint:', {
+            status: updatedBlueprint.status,
+            symbolsCount: updatedBlueprint.symbols?.length || 0,
+            aiAnalyzed: updatedBlueprint.aiAnalysis?.isAnalyzed,
+            symbols: updatedBlueprint.symbols
+          });
+          console.log('📋 Raw blueprint data:', JSON.stringify(updatedBlueprint, null, 2));
+
+          // Update local state with new data
+          setUploadedBlueprint(updatedBlueprint);
+
+          // Stop polling if analysis is complete or failed
+          if (updatedBlueprint.status === 'completed' || updatedBlueprint.status === 'failed') {
+            console.log('✅ Blueprint analysis completed, stopping polling');
+            setIsPollingForUpdates(false);
+            clearInterval(pollInterval);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error polling for blueprint updates:', error);
+        // Continue polling even on error, but maybe reduce frequency
+      }
+    }, 3000); // Poll every 3 seconds
+
+    // Stop polling after 2 minutes max
+    const maxPollTime = setTimeout(() => {
+      console.log('⏰ Max polling time reached, stopping updates');
+      setIsPollingForUpdates(false);
+      clearInterval(pollInterval);
+    }, 120000);
+
+    return () => {
+      clearInterval(pollInterval);
+      clearTimeout(maxPollTime);
+      setIsPollingForUpdates(false);
+    };
+  }, [uploadedBlueprint?.id, uploadedBlueprint?.status]);
+
+  const handleManualRefresh = async () => {
+    if (!uploadedBlueprint?.id) return;
+    
+    console.log('🔄 Manual refresh triggered for blueprint:', uploadedBlueprint.id);
+    try {
+      const result = await getBlueprintById(uploadedBlueprint.id);
+      if (result.success && result.data) {
+        console.log('📋 Manual refresh - received data:', result.data);
+        setUploadedBlueprint(result.data);
+      } else {
+        console.error('❌ Manual refresh failed:', result.message);
+      }
+    } catch (error) {
+      console.error('❌ Manual refresh error:', error);
+    }
+  };
 
   const handleBlueprintUploaded = (blueprint: Blueprint, file?: File) => {
     console.log('📋 [DASHBOARD] Blueprint uploaded, received:', blueprint);
@@ -70,7 +144,7 @@ export function Dashboard() {
           <div className="flex items-start justify-between">
             <div>
               <h1 className="text-3xl font-bold text-foreground mb-2">
-                Upload Blueprint
+                AI Blueprint Analysis
               </h1>
               <p className="text-muted-foreground">
                 Upload your engineering blueprints for AI-powered symbol detection and analysis
@@ -117,14 +191,34 @@ export function Dashboard() {
                       {uploadedBlueprint.name}
                     </h2>
                     <p className="text-muted-foreground">
-                      Blueprint ready to save • {uploadedBlueprint.symbols.length} symbols detected
+                      {uploadedBlueprint.status === 'processing' 
+                        ? `AI analysis in progress... ${uploadedBlueprint.symbols.length} symbols detected so far`
+                        : `Blueprint ready to save • ${uploadedBlueprint.symbols.length} symbols detected`
+                      }
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 text-sm text-blue-600">
-                      <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-                      Ready to Save
-                    </div>
+                    {uploadedBlueprint.status === 'processing' ? (
+                      <div className="flex items-center gap-2 text-sm text-blue-600">
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        {isPollingForUpdates ? 'Analyzing...' : 'Processing...'}
+                      </div>
+                    ) : uploadedBlueprint.status === 'completed' ? (
+                      <div className="flex items-center gap-2 text-sm text-green-600">
+                        <div className="w-2 h-2 rounded-full bg-green-600" />
+                        Analysis Complete
+                      </div>
+                    ) : uploadedBlueprint.status === 'failed' ? (
+                      <div className="flex items-center gap-2 text-sm text-red-600">
+                        <div className="w-2 h-2 rounded-full bg-red-600" />
+                        Analysis Failed
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 text-sm text-blue-600">
+                        <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                        Ready to Save
+                      </div>
+                    )}
                     <Button
                       onClick={() => setShowConfirmDialog(true)}
                       variant="outline"
@@ -134,6 +228,17 @@ export function Dashboard() {
                       <Upload className="w-4 h-4" />
                       New Upload
                     </Button>
+                    {uploadedBlueprint.status === 'processing' && (
+                      <Button
+                        onClick={handleManualRefresh}
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        Refresh
+                      </Button>
+                    )}
                   </div>
                 </div>
                 
@@ -148,6 +253,11 @@ export function Dashboard() {
               />
             </div>
           )}
+
+          {/* AI Service Testing Panel */}
+          <div className="mt-8">
+            <AITestPanel />
+          </div>
         </div>
       </main>
 

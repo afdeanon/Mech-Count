@@ -6,7 +6,7 @@ import { User } from '../models/User';
 import { Project } from '../models/Project';
 import { AIUsage } from '../models/AIUsage';
 import { uploadToS3, deleteFromS3, validateS3Config } from '../services/s3Service';
-import { analyzeBlueprint, validateImageForAnalysis, getAnalysisCost } from '../services/aiService';
+import { analyzeBlueprint, validateImageForAnalysis, getAnalysisCost, checkAIServiceHealth } from '../services/aiService';
 import sharp from 'sharp';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -350,6 +350,15 @@ export async function getBlueprintById(req: Request, res: Response) {
       });
     }
 
+    console.log('📋 [DEBUG] getBlueprintById returning blueprint:', {
+      id: blueprint._id,
+      name: blueprint.name,
+      status: blueprint.status,
+      symbolsCount: blueprint.symbols?.length || 0,
+      aiAnalysis: blueprint.aiAnalysis,
+      symbols: blueprint.symbols?.map(s => ({ name: s.name, confidence: s.confidence })) || []
+    });
+
     res.json({
       success: true,
       data: blueprint
@@ -431,23 +440,35 @@ export async function updateBlueprint(req: Request, res: Response) {
 async function processAIAnalysis(blueprintId: string, imageBuffer: Buffer, mimeType: string, userId?: mongoose.Types.ObjectId) {
   try {
     console.log(`🤖 Starting AI analysis for blueprint ${blueprintId}`);
+    console.log(`🤖 Image details: size=${imageBuffer.length} bytes, type=${mimeType}`);
 
     // Validate image for AI analysis
     const validation = validateImageForAnalysis(imageBuffer, mimeType);
     if (!validation.valid) {
+      console.error(`❌ Image validation failed: ${validation.reason}`);
       throw new Error(`Image validation failed: ${validation.reason}`);
     }
+    console.log(`✅ Image validation passed`);
 
     // Check user's AI quota if userId provided
     if (userId) {
       const canAnalyze = await AIUsage.canUserAnalyze(userId);
       if (!canAnalyze.canAnalyze) {
+        console.error(`❌ AI quota exceeded for user ${userId}: ${canAnalyze.remaining} remaining`);
         throw new Error(`AI analysis quota exceeded. ${canAnalyze.remaining} analyses remaining this month.`);
       }
+      console.log(`✅ User ${userId} has AI quota available`);
     }
 
     // Perform AI analysis
+    console.log(`🤖 Calling OpenAI Vision API...`);
     const analysisResult = await analyzeBlueprint(imageBuffer, mimeType);
+    console.log(`🤖 AI analysis completed:`, {
+      symbolsFound: analysisResult.symbols.length,
+      confidence: analysisResult.confidence,
+      processingTime: analysisResult.processingTime,
+      summary: analysisResult.summary
+    });
 
     // Convert AI symbols to blueprint format
     const blueprintSymbols = analysisResult.symbols.map(symbol => ({
@@ -459,8 +480,13 @@ async function processAIAnalysis(blueprintId: string, imageBuffer: Buffer, mimeT
       position: symbol.coordinates || { x: 0, y: 0, width: 100, height: 100 },
       confidence: symbol.confidence / 100 // Convert percentage to decimal
     }));
+    
+    console.log(`📝 Converted to ${blueprintSymbols.length} blueprint symbols:`, 
+      blueprintSymbols.map(s => ({ name: s.name, confidence: s.confidence }))
+    );
 
     // Update blueprint with AI results
+    console.log(`💾 Updating blueprint ${blueprintId} with analysis results...`);
     const updatedBlueprint = await Blueprint.findByIdAndUpdate(
       blueprintId,
       {
@@ -559,18 +585,49 @@ export async function analyzeExistingBlueprint(req: Request, res: Response) {
       });
     }
 
-    // Download image from S3 for analysis
-    // For now, return success and note that analysis will start
-    // In production, you'd download the image from S3 and process it
+    // Start AI analysis
+    console.log('🧠 Starting AI analysis for blueprint:', blueprint._id);
+    
+    // Mark blueprint as processing
+    blueprint.status = 'processing';
+    await blueprint.save();
 
-    res.json({
-      success: true,
-      message: 'AI analysis started for blueprint',
-      data: {
-        blueprintId: (blueprint._id as mongoose.Types.ObjectId).toString(),
-        status: 'processing'
-      }
-    });
+    try {
+      // We need to download the image from S3 first to get the buffer
+      // For now, we'll implement a simpler approach by requiring re-upload
+      // or we need to download from S3 and get the buffer
+      
+      console.log('🧠 This endpoint requires downloading from S3 - not implemented yet');
+      
+      // Temporary response - in production you'd download from S3
+      res.status(501).json({
+        success: false,
+        message: 'Re-analysis of existing blueprints not yet implemented. Please re-upload the blueprint for AI analysis.',
+        data: {
+          blueprintId: (blueprint._id as mongoose.Types.ObjectId).toString(),
+          suggestion: 'Delete and re-upload this blueprint to trigger AI analysis'
+        }
+      });
+
+    } catch (analysisError) {
+      console.error('❌ AI analysis failed:', analysisError);
+      
+      // Update blueprint status to failed
+      blueprint.status = 'failed';
+      blueprint.aiAnalysis = {
+        isAnalyzed: false,
+        confidence: 0,
+        summary: 'Analysis failed: ' + (analysisError instanceof Error ? analysisError.message : 'Unknown error'),
+        processingTime: 0
+      };
+      await blueprint.save();
+      
+      res.status(500).json({
+        success: false,
+        message: 'AI analysis failed',
+        error: analysisError instanceof Error ? analysisError.message : 'Unknown error'
+      });
+    }
 
   } catch (error) {
     console.error('AI analysis trigger error:', error);
@@ -578,6 +635,62 @@ export async function analyzeExistingBlueprint(req: Request, res: Response) {
       success: false,
       message: 'Failed to start AI analysis',
       error: process.env.NODE_ENV === 'development' ? (error as Error).message : 'Internal server error'
+    });
+  }
+}
+
+/**
+ * Test AI service health and capabilities
+ */
+export async function testAIService(req: Request, res: Response) {
+  try {
+    console.log('🧪 Testing AI service health...');
+    
+    const healthCheck = await checkAIServiceHealth();
+    
+    if (!healthCheck.available) {
+      return res.status(503).json({
+        success: false,
+        message: 'AI service unavailable',
+        error: healthCheck.error,
+        data: {
+          openaiConfigured: !!process.env.OPENAI_API_KEY,
+          model: 'gpt-4o',
+          features: ['symbol-detection', 'blueprint-analysis']
+        }
+      });
+    }
+
+    // Test with a small sample image analysis
+    const testImageBuffer = Buffer.from('test');
+    const cost = getAnalysisCost(testImageBuffer.length);
+    
+    res.json({
+      success: true,
+      message: 'AI service is healthy and ready',
+      data: {
+        available: true,
+        model: 'gpt-4o',
+        estimatedCost: `$${cost} per analysis`,
+        features: [
+          'Hydraulic symbol detection',
+          'Pneumatic symbol detection', 
+          'Mechanical component identification',
+          'Electrical symbol recognition',
+          'System analysis and summary'
+        ],
+        supportedFormats: ['JPEG', 'PNG', 'GIF', 'WebP'],
+        maxFileSize: '20MB',
+        processingTime: '5-15 seconds'
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ AI service test failed:', error);
+    res.status(500).json({
+      success: false,
+      message: 'AI service test failed',
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 }

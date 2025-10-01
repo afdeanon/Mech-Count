@@ -4,7 +4,7 @@ const API_BASE_URL = 'http://localhost:3000/api';
  * Trigger AI analysis for an existing blueprint
  */
 export const analyzeBlueprint = async (blueprintId: string, token: string) => {
-  const response = await fetch(`${API_BASE_URL}/api/blueprints/${blueprintId}/analyze`, {
+  const response = await fetch(`${API_BASE_URL}/blueprints/${blueprintId}/analyze`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -25,7 +25,7 @@ export const analyzeBlueprint = async (blueprintId: string, token: string) => {
  */
 export const checkAIServiceHealth = async (token: string) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/api/blueprints/ai/health`, {
+    const response = await fetch(`${API_BASE_URL}/blueprints/ai/health`, {
       headers: {
         'Authorization': `Bearer ${token}`,
       },
