@@ -139,7 +139,7 @@ export function SymbolAnalysis({ blueprint, onSaveToProject, showSaveButton = tr
               </div>
               <Button onClick={onSaveToProject} className="btn-tech gap-2">
                 <Save className="w-4 h-4" />
-                Save to Project
+                Save Blueprint
               </Button>
             </div>
           </CardContent>

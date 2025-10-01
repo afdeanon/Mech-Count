@@ -7,6 +7,7 @@ const API_BASE_URL = 'http://localhost:3000/api';
 function transformProject(apiProject: any): Project {
   return {
     ...apiProject,
+    id: apiProject._id || apiProject.id, // Ensure we have 'id' field from '_id'
     createdAt: new Date(apiProject.createdAt),
     // Handle both 'blueprints' and 'blueprintIds' from the API
     blueprints: apiProject.blueprints || apiProject.blueprintIds || []

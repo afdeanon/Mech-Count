@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
+import path from 'path';
 import { connectDB } from './config/database';
 
 // Import routes
@@ -9,7 +10,15 @@ import userRoutes from './routes/users';
 import projectRoutes from './routes/projects';
 import blueprintRoutes from './routes/blueprints';
 
-dotenv.config();
+// Load environment variables from .env file
+dotenv.config({ path: path.join(__dirname, '../.env') });
+
+// Debug: Check if env vars are loaded
+console.log('🔧 Environment check:');
+console.log('- NODE_ENV:', process.env.NODE_ENV);
+console.log('- PORT:', process.env.PORT);
+console.log('- FIREBASE_PROJECT_ID:', process.env.FIREBASE_PROJECT_ID);
+console.log('- MONGODB_URI exists:', !!process.env.MONGODB_URI);
 
 const app = express();
 const PORT = process.env.PORT || 3000;

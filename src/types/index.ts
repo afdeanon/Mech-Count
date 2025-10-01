@@ -9,6 +9,8 @@ export interface MechanicalSymbol {
   id: string;
   type: string;
   name: string;
+  description?: string;
+  category: 'hydraulic' | 'pneumatic' | 'mechanical' | 'electrical' | 'other';
   position: {
     x: number;
     y: number;
@@ -28,6 +30,15 @@ export interface Blueprint {
   totalSymbols: number;
   averageAccuracy: number;
   projectId?: string;
+  status: 'processing' | 'completed' | 'failed';
+  aiAnalysis?: {
+    isAnalyzed: boolean;
+    analysisDate?: Date;
+    processingTime?: number;
+    confidence: number;
+    summary?: string;
+    errorMessage?: string;
+  };
 }
 
 export interface Project {

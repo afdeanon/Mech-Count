@@ -5,11 +5,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { CheckCircle, Plus } from 'lucide-react';
+import { CheckCircle, Plus, X } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { Blueprint, Project } from '@/types';
 import { createProject, addBlueprintToProject } from '@/services/projectService';
-import { saveBlueprintToHistory } from '@/services/blueprintService';
+import { saveBlueprintToHistory, updateBlueprint } from '@/services/blueprintService';
 import { useToast } from '@/hooks/use-toast';
 
 interface SaveToProjectModalProps {
@@ -30,6 +30,11 @@ export function SaveToProjectModal({ isOpen, onClose, blueprint, originalFile, o
   const [showNewProject, setShowNewProject] = useState(false);
   const [saved, setSaved] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  
+  console.log('🔍 [DEBUG] SaveToProjectModal received blueprint:', blueprint);
+  console.log('🔍 [DEBUG] SaveToProjectModal received originalFile:', !!originalFile);
+  console.log('🔍 [DEBUG] SaveToProjectModal blueprint ID:', blueprint?.id);
+  console.log('🔍 [DEBUG] SaveToProjectModal blueprint object keys:', blueprint ? Object.keys(blueprint) : 'blueprint is null');
 
   const { state, dispatch } = useApp();
   const { toast } = useToast();
@@ -38,7 +43,7 @@ export function SaveToProjectModal({ isOpen, onClose, blueprint, originalFile, o
   useEffect(() => {
     if (preSelectedProjectId) {
       setSelectedProjectId(preSelectedProjectId);
-      setShowNewProject(false);
+      setShowNewProject(false); // Don't show new project form if we have a pre-selected project
     }
   }, [preSelectedProjectId]);
 
@@ -66,21 +71,43 @@ export function SaveToProjectModal({ isOpen, onClose, blueprint, originalFile, o
           dispatch({ type: 'ADD_PROJECT', payload: projectResponse.data });
           projectId = projectResponse.data.id;
           console.log('✅ Project created successfully:', projectId);
-          console.log('🔍 [SaveToProjectModal] New project data:', projectResponse.data);
         } else {
           throw new Error(projectResponse.message || 'Failed to create project');
         }
       }
 
-      // Step 2: Handle blueprint save/upload
+      // Step 2: Handle blueprint save/update
       console.log('💾 Processing blueprint...');
+      console.log('� Blueprint ID:', blueprint.id);
+      console.log('🔍 Blueprint ID type:', typeof blueprint.id);
+      console.log('🔍 Is temporary ID?', blueprint.id?.startsWith('blueprint-'));
+      console.log('🔍 Is draft ID?', blueprint.id?.startsWith('draft-'));
       
-      // Check if this is a new blueprint (temp ID) or existing blueprint (real server ID)
-      const isNewBlueprint = blueprint.id?.startsWith('temp-') || !blueprint.id || blueprint.id.length < 20;
-      
-      if (isNewBlueprint) {
-        // New blueprint - needs to be uploaded
-        console.log('� Uploading new blueprint...');
+      // If blueprint has a real server ID (not temporary or draft), just update it
+      if (blueprint.id && !blueprint.id.startsWith('blueprint-') && !blueprint.id.startsWith('draft-')) {
+        console.log('📝 Blueprint already exists on server, updating name/description...');
+        console.log('📝 [DEBUG] Attempting to update blueprint ID:', blueprint.id);
+        
+        const updateResponse = await updateBlueprint(blueprint.id, {
+          name: blueprintName,
+          description: blueprintDescription
+        });
+        
+        if (updateResponse.success && updateResponse.data) {
+          savedBlueprint = {
+            ...blueprint,
+            ...updateResponse.data,
+            name: blueprintName,
+            description: blueprintDescription
+          };
+          
+          console.log('✅ Blueprint updated successfully');
+        } else {
+          throw new Error(updateResponse.message || 'Failed to update blueprint');
+        }
+      } else if (blueprint.id && (blueprint.id.startsWith('blueprint-') || blueprint.id.startsWith('draft-'))) {
+        // Blueprint has temporary or draft ID, need to upload it
+        console.log('💾 Uploading blueprint with temporary/draft ID...');
         
         if (!originalFile) {
           throw new Error('Cannot save new blueprint without original file');
@@ -95,32 +122,68 @@ export function SaveToProjectModal({ isOpen, onClose, blueprint, originalFile, o
         const saveResponse = await saveBlueprintToHistory(blueprintData, originalFile);
         
         if (saveResponse.success && saveResponse.data) {
+          // Use the complete server response data, which includes the new permanent image URL
           savedBlueprint = {
             ...saveResponse.data,
             id: saveResponse.data._id || saveResponse.data.id,
             name: blueprintName,
             description: blueprintDescription,
+            // Ensure we keep any additional frontend-only properties if needed
             symbols: blueprint.symbols || saveResponse.data.symbols || []
           };
           
-          console.log('✅ New blueprint uploaded successfully');
+          console.log('✅ Blueprint uploaded with new data:', {
+            id: savedBlueprint.id,
+            oldImageUrl: blueprint.imageUrl,
+            newImageUrl: savedBlueprint.imageUrl,
+            isOldBlob: blueprint.imageUrl?.startsWith('blob:'),
+            isNewS3: savedBlueprint.imageUrl?.includes('amazonaws.com')
+          });
         } else {
           throw new Error(saveResponse.message || 'Failed to save blueprint');
         }
       } else {
-        // Existing blueprint - just update name/description if they changed
-        console.log('📝 Using existing blueprint...');
+        // Blueprint ID is undefined - this is the problem case
+        console.error('❌ [ERROR] Blueprint ID is undefined! This should not happen.');
+        console.error('❌ [ERROR] Blueprint object:', blueprint);
+        console.error('❌ [ERROR] This means the upload succeeded but the ID was lost in the frontend.');
         
-        savedBlueprint = {
+        // Try to find the blueprint by name/filename as a fallback
+        console.log('🔍 [FALLBACK] Attempting to find recently uploaded blueprint...');
+        
+        if (!originalFile) {
+          throw new Error('Cannot save blueprint without original file and ID is missing');
+        }
+        
+        // Upload as new but with proper name this time
+        const blueprintData = {
           ...blueprint,
           name: blueprintName,
           description: blueprintDescription
         };
         
-        // Only update on server if name or description actually changed
-        if (blueprintName !== blueprint.name || blueprintDescription !== (blueprint.description || '')) {
-          console.log('📝 Updating blueprint name/description...');
-          // Note: We could add an updateBlueprint call here if needed
+        const saveResponse = await saveBlueprintToHistory(blueprintData, originalFile);
+        
+        if (saveResponse.success && saveResponse.data) {
+          // Use the complete server response data, which includes the new permanent image URL
+          savedBlueprint = {
+            ...saveResponse.data,
+            id: saveResponse.data._id || saveResponse.data.id,
+            name: blueprintName,
+            description: blueprintDescription,
+            // Ensure we keep any additional frontend-only properties if needed
+            symbols: blueprint.symbols || saveResponse.data.symbols || []
+          };
+          
+          console.log('✅ Blueprint uploaded with new data (fallback):', {
+            id: savedBlueprint.id,
+            oldImageUrl: blueprint.imageUrl,
+            newImageUrl: savedBlueprint.imageUrl,
+            isOldBlob: blueprint.imageUrl?.startsWith('blob:'),
+            isNewS3: savedBlueprint.imageUrl?.includes('amazonaws.com')
+          });
+        } else {
+          throw new Error(saveResponse.message || 'Failed to save blueprint');
         }
       }
 
@@ -131,23 +194,33 @@ export function SaveToProjectModal({ isOpen, onClose, blueprint, originalFile, o
         const linkResponse = await addBlueprintToProject(projectId, savedBlueprint.id);
         
         if (linkResponse.success) {
+          // Create the final blueprint with project association
           const finalBlueprint: Blueprint = {
             ...savedBlueprint,
             projectId
           };
 
-          // Check if blueprint already exists in state
+          // Check if blueprint already exists in state to decide between ADD vs UPDATE
           const existingBlueprint = state.blueprints.find(bp => bp.id === finalBlueprint.id);
           
           if (existingBlueprint) {
+            // Update existing blueprint with project association
             dispatch({ type: 'UPDATE_BLUEPRINT', payload: finalBlueprint });
           } else {
+            // Add new blueprint to state (for dashboard upload flow)
             dispatch({ type: 'ADD_BLUEPRINT', payload: finalBlueprint });
           }
           blueprintAddedToHistory = true;
 
-          // Note: ProjectDetail uses state.blueprints filtered by projectId, 
-          // so we don't need to update project.blueprints array
+          // Also update the project to include the blueprint in its blueprints array
+          const currentProject = state.projects.find(p => p.id === projectId);
+          if (currentProject) {
+            const updatedProject: Project = {
+              ...currentProject,
+              blueprints: [...currentProject.blueprints, finalBlueprint]
+            };
+            dispatch({ type: 'UPDATE_PROJECT', payload: updatedProject });
+          }
 
           setSaved(true);
           
@@ -159,18 +232,21 @@ export function SaveToProjectModal({ isOpen, onClose, blueprint, originalFile, o
           setTimeout(() => {
             setSaved(false);
             resetForm();
-            console.log('🔍 [SaveToProjectModal] Final state - projectId:', projectId, 'blueprintId:', savedBlueprint.id);
-            onSaved({
+            
+            // Create updated blueprint object with projectId
+            const updatedBlueprint = {
               ...savedBlueprint,
               projectId: projectId
-            });
+            };
+            
+            onSaved(updatedBlueprint);
             onClose();
           }, 1500);
         } else {
           throw new Error(linkResponse.message || 'Failed to add blueprint to project');
         }
       } else {
-        // No project selected, just save to history
+        // If no project selected, just save the blueprint to history
         dispatch({ type: 'ADD_BLUEPRINT', payload: savedBlueprint });
         blueprintAddedToHistory = true;
         
@@ -184,7 +260,14 @@ export function SaveToProjectModal({ isOpen, onClose, blueprint, originalFile, o
         setTimeout(() => {
           setSaved(false);
           resetForm();
-          onSaved(savedBlueprint);
+          
+          // Create updated blueprint object with projectId  
+          const updatedBlueprint = {
+            ...savedBlueprint,
+            projectId: selectedProjectId
+          };
+          
+          onSaved(updatedBlueprint);
           onClose();
         }, 1500);
       }
@@ -229,7 +312,7 @@ export function SaveToProjectModal({ isOpen, onClose, blueprint, originalFile, o
               Blueprint Saved!
             </h3>
             <p className="text-muted-foreground">
-              Your blueprint has been successfully saved.
+              Your blueprint has been successfully saved to the project.
             </p>
           </div>
         </DialogContent>

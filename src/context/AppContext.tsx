@@ -21,6 +21,7 @@ type AppAction =
   | { type: 'SET_CURRENT_BLUEPRINT'; payload: Blueprint | null }
   | { type: 'SET_CURRENT_PROJECT'; payload: Project | null };
 
+
 const initialState: AppState = {
   auth: {
     isAuthenticated: false,
@@ -160,20 +161,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
   // Debug function to check storage
-  const debugStorage = () => {
-    console.log('🔍 Debugging storage...');
-    console.log('localStorage length:', localStorage.length);
-    console.log('sessionStorage length:', sessionStorage.length);
-    
-    // Check for Firebase keys
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key?.includes('firebase') || key?.includes('auth')) {
-        console.log('🔑 Found auth key:', key, localStorage.getItem(key));
-      }
-    }
-  };
-
   // Function to load user blueprints
   const loadUserBlueprints = async () => {
     try {
@@ -183,6 +170,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const response = await getUserBlueprints();
       if (response.success && response.data) {
         console.log('📋 Loaded blueprints:', response.data);
+        // Debug: Check projectId values
+        response.data.forEach((bp: any) => {
+          console.log(`  - Blueprint ${bp._id || bp.id}: "${bp.name}" (projectId: ${bp.projectId})`);
+        });
         dispatch({ type: 'SET_BLUEPRINTS', payload: response.data });
       } else {
         console.warn('📋 Failed to load blueprints:', response.message);
@@ -221,7 +212,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Set up authentication state listener
   useEffect(() => {
     console.log('🚀 App starting up...');
-    debugStorage();
     
     const unsubscribe = onAuthStateChange(async (user) => {
       console.log('🔐 Auth state changed:', user ? 'User logged in' : 'User logged out');

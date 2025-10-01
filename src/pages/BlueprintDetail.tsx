@@ -11,7 +11,7 @@ import { useState } from 'react';
 export function BlueprintDetail() {
   const { blueprintId, projectId } = useParams<{ blueprintId: string; projectId?: string }>();
   const navigate = useNavigate();
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
   const [showSaveModal, setShowSaveModal] = useState(false);
 
   const blueprint = state.blueprints.find(b => b.id === blueprintId);
@@ -122,8 +122,11 @@ export function BlueprintDetail() {
         isOpen={showSaveModal}
         onClose={() => setShowSaveModal(false)}
         blueprint={blueprint}
-        onSaved={() => {
+        onSaved={(updatedBlueprint) => {
           setShowSaveModal(false);
+          if (updatedBlueprint) {
+            dispatch({ type: 'UPDATE_BLUEPRINT', payload: updatedBlueprint });
+          }
         }}
       />
     </div>

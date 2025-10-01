@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Sidebar } from '@/components/Layout/Sidebar';
 import { UploadArea } from '@/components/Upload/UploadArea';
 import { BlueprintViewer } from '@/components/Blueprint/BlueprintViewer';
 import { SymbolAnalysis } from '@/components/Blueprint/SymbolAnalysis';
 import { SaveToProjectModal } from '@/components/Project/SaveToProjectModal';
 import { Button } from '@/components/ui/button';
-import { useApp } from '@/context/AppContext';
 import { Blueprint } from '@/types';
-import { Save, Upload, RotateCcw } from 'lucide-react';
+import { deleteBlueprint } from '@/services/blueprintService';
+import { Save, Upload } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,22 +20,26 @@ import {
 } from '@/components/ui/alert-dialog';
 
 export function Dashboard() {
-  const { state, dispatch } = useApp();
-  const [uploadedBlueprint, setUploadedBlueprint] = useState<Blueprint | null>(null);
-  const [originalFile, setOriginalFile] = useState<File | null>(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [showDiscardDialog, setShowDiscardDialog] = useState(false);
+
+  // Use LOCAL state for uploaded blueprints in this session only
+  const [uploadedBlueprint, setUploadedBlueprint] = useState<Blueprint | null>(null);
+  const [originalFile, setOriginalFile] = useState<File | null>(null);
 
   const handleBlueprintUploaded = (blueprint: Blueprint, file?: File) => {
+    console.log('📋 [DASHBOARD] Blueprint uploaded, received:', blueprint);
+    // Store in local state instead of global context
     setUploadedBlueprint(blueprint);
-    if (file) {
-      setOriginalFile(file);
-    }
+    setOriginalFile(file || null);
+    // Draft is already stored in context by UploadArea
   };
 
   const handleSaveToProject = () => {
+    console.log('📋 [DASHBOARD] Opening SaveToProjectModal with blueprint:', uploadedBlueprint);
+    console.log('📋 [DASHBOARD] Blueprint ID being passed:', uploadedBlueprint?.id);
+    console.log('📋 [DASHBOARD] Blueprint ID type:', typeof uploadedBlueprint?.id);
     setShowSaveModal(true);
   };
 
@@ -43,26 +47,19 @@ export function Dashboard() {
     setShowConfirmDialog(true);
   };
 
-  const handleDiscardBlueprint = () => {
-    setShowDiscardDialog(true);
-  };
-
-  const confirmDiscardBlueprint = () => {
-    setUploadedBlueprint(null);
-    setOriginalFile(null);
-    setIsProcessing(false);
-    setShowDiscardDialog(false);
-  };
-
   const confirmUploadNew = () => {
-    // Save current blueprint to history before clearing
-    if (uploadedBlueprint) {
-      dispatch({ type: 'ADD_BLUEPRINT', payload: uploadedBlueprint });
+    // Clean up local blob URL if it exists
+    if (uploadedBlueprint?.imageUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(uploadedBlueprint.imageUrl);
     }
+    
+    // Clear local state to allow new upload
     setUploadedBlueprint(null);
     setOriginalFile(null);
     setIsProcessing(false);
     setShowConfirmDialog(false);
+    
+    console.log('🆕 Ready for new upload - previous blueprint cleared');
   };
 
   return (
@@ -89,7 +86,7 @@ export function Dashboard() {
                   size="sm"
                 >
                   <Save className="w-4 h-4" />
-                  Save to Project
+                  Save Blueprint
                 </Button>
                 <Button 
                   onClick={handleUploadNewBlueprint} 
@@ -99,15 +96,6 @@ export function Dashboard() {
                 >
                   <Upload className="w-4 h-4" />
                   Upload New Blueprint
-                </Button>
-                <Button 
-                  onClick={handleDiscardBlueprint} 
-                  variant="outline" 
-                  className="gap-2 px-4 py-2 text-destructive hover:text-destructive"
-                  size="sm"
-                >
-                  <RotateCcw className="w-4 h-4" />
-                  Discard Blueprint
                 </Button>
               </div>
             )}
@@ -129,14 +117,23 @@ export function Dashboard() {
                       {uploadedBlueprint.name}
                     </h2>
                     <p className="text-muted-foreground">
-                      Analysis complete • {uploadedBlueprint.symbols.length} symbols detected
+                      Blueprint ready to save • {uploadedBlueprint.symbols.length} symbols detected
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 text-sm text-success">
-                      <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
-                      Processing Complete
+                    <div className="flex items-center gap-2 text-sm text-blue-600">
+                      <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
+                      Ready to Save
                     </div>
+                    <Button
+                      onClick={() => setShowConfirmDialog(true)}
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                    >
+                      <Upload className="w-4 h-4" />
+                      New Upload
+                    </Button>
                   </div>
                 </div>
                 
@@ -159,10 +156,25 @@ export function Dashboard() {
         onClose={() => setShowSaveModal(false)}
         blueprint={uploadedBlueprint}
         originalFile={originalFile}
-        onSaved={() => {
+        onSaved={(updatedBlueprint?: Blueprint) => {
+          console.log('📋 [Dashboard] Blueprint saved successfully:', updatedBlueprint);
           setShowSaveModal(false);
+          // Clear local state after successful save
           setUploadedBlueprint(null);
           setOriginalFile(null);
+          
+          // Clean up local blob URL if it exists
+          if (uploadedBlueprint?.imageUrl?.startsWith('blob:')) {
+            URL.revokeObjectURL(uploadedBlueprint.imageUrl);
+          }
+          
+          console.log('✅ [Dashboard] Local state cleared after save');
+          
+          // Optional: Navigate to project detail if blueprint was assigned to a project
+          if (updatedBlueprint?.projectId) {
+            console.log('🔗 [Dashboard] Blueprint assigned to project:', updatedBlueprint.projectId);
+            // Note: Not auto-navigating to let user decide, but logging for debugging
+          }
         }}
       />
 
@@ -171,30 +183,13 @@ export function Dashboard() {
           <AlertDialogHeader>
             <AlertDialogTitle>Upload New Blueprint?</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to upload a new blueprint? The current analysis will be saved to your history and a new upload process will begin.
+              Are you sure you want to upload a new blueprint? The current blueprint will be discarded and a new upload process will begin.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmUploadNew}>
-              Yes, Save & Upload New
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={showDiscardDialog} onOpenChange={setShowDiscardDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Discard Blueprint?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to discard this blueprint? This action will permanently delete the current analysis and it will NOT be saved to your history. This cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDiscardBlueprint} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Yes, Discard Permanently
+              Yes, Start New Upload
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

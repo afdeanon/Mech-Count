@@ -5,6 +5,8 @@ export interface IMechanicalSymbol {
   id: string;
   type: string;
   name: string;
+  description?: string;
+  category: 'hydraulic' | 'pneumatic' | 'mechanical' | 'electrical' | 'other';
   position: {
     x: number;
     y: number;
@@ -29,6 +31,14 @@ export interface IBlueprint extends Document {
   userId: mongoose.Types.ObjectId;
   status: 'processing' | 'completed' | 'failed';
   processingError?: string;
+  aiAnalysis: {
+    isAnalyzed: boolean;
+    analysisDate?: Date;
+    processingTime?: number;
+    confidence: number;
+    summary?: string;
+    errorMessage?: string;
+  };
   metadata: {
     dimensions: {
       width: number;
@@ -46,6 +56,12 @@ const MechanicalSymbolSchema = new Schema<IMechanicalSymbol>({
   id: { type: String, required: true },
   type: { type: String, required: true },
   name: { type: String, required: true },
+  description: { type: String, default: '' },
+  category: {
+    type: String,
+    enum: ['hydraulic', 'pneumatic', 'mechanical', 'electrical', 'other'],
+    default: 'other'
+  },
   position: {
     x: { type: Number, required: true },
     y: { type: Number, required: true },
@@ -119,6 +135,14 @@ const BlueprintSchema = new Schema<IBlueprint>({
   processingError: {
     type: String,
     default: null
+  },
+  aiAnalysis: {
+    isAnalyzed: { type: Boolean, default: false },
+    analysisDate: { type: Date },
+    processingTime: { type: Number },
+    confidence: { type: Number, default: 0, min: 0, max: 100 },
+    summary: { type: String, default: '' },
+    errorMessage: { type: String }
   },
   metadata: {
     dimensions: {

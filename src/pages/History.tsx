@@ -15,6 +15,27 @@ export function History() {
   const { state, dispatch } = useApp();
   const { toast } = useToast();
 
+  // Show loading state if auth is still loading
+  if (state.auth.isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Sidebar />
+        <main className="ml-64 p-6">
+          <div className="max-w-6xl mx-auto space-y-8">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground mb-2">
+                Upload History
+              </h1>
+              <p className="text-muted-foreground">
+                Loading...
+              </p>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   const handleDeleteBlueprint = async (blueprintId: string, blueprintName: string) => {
     if (confirm(`Are you sure you want to delete "${blueprintName}"? This action cannot be undone.`)) {
       try {
@@ -40,12 +61,21 @@ export function History() {
     }
   };
 
-  // Sort blueprints by upload date (newest first)
-  const sortedBlueprints = useMemo(() => {
-    return [...state.blueprints].sort((a, b) => 
-      new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()
-    );
-  }, [state.blueprints]);
+    // Sort blueprints by upload date (newest first)
+  const sortedBlueprints = [...state.blueprints]
+    .sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime());
+
+  console.log('🔍 History page state:', {
+    totalBlueprints: state.blueprints.length,
+    filteredBlueprints: sortedBlueprints.length,
+    blueprints: state.blueprints.map(bp => ({
+      id: bp.id,
+      name: bp.name,
+      imageUrl: bp.imageUrl,
+      hasImageUrl: !!bp.imageUrl,
+      isBlob: bp.imageUrl?.startsWith('blob:')
+    }))
+  });
 
   // Get recent blueprints (last 3)
   const recentBlueprints = sortedBlueprints.slice(0, 3);
@@ -117,12 +147,8 @@ export function History() {
                             </div>
 
                             <div className="flex items-center justify-between">
-                              <Badge variant="secondary" className="text-xs">
-                                {Math.round(blueprint.averageAccuracy)}% accuracy
-                              </Badge>
-                              
                               {blueprint.projectId && (
-                                <Badge variant="outline" className="text-xs">
+                                <Badge variant="outline" className="text-xs bg-white/90 text-gray-800">
                                   {getProjectName(blueprint.projectId)}
                                 </Badge>
                               )}
@@ -130,6 +156,13 @@ export function History() {
                           </CardContent>
                         </Card>
                       </Link>
+
+                      {/* Accuracy badge positioned to left of three-dot menu */}
+                      <div className="absolute top-4 left-4">
+                        <Badge variant="secondary" className="text-xs bg-white/90 text-gray-800">
+                          {Math.round(blueprint.averageAccuracy)}% accuracy
+                        </Badge>
+                      </div>
 
                       {/* Three-dot menu */}
                       <div className="absolute top-4 right-4">
@@ -206,16 +239,6 @@ export function History() {
                                   <h3 className="text-lg font-semibold text-foreground truncate">
                                     {blueprint.name}
                                   </h3>
-                                  <div className="flex items-center gap-2 ml-4">
-                                    <Badge variant="secondary" className="text-xs">
-                                      {Math.round(blueprint.averageAccuracy)}% accuracy
-                                    </Badge>
-                                    {blueprint.projectId && (
-                                      <Badge variant="outline" className="text-xs">
-                                        {getProjectName(blueprint.projectId)}
-                                      </Badge>
-                                    )}
-                                  </div>
                                 </div>
                                 
                                 {blueprint.description && (
@@ -241,8 +264,16 @@ export function History() {
                         </Card>
                       </Link>
 
-                      {/* Three-dot menu */}
-                      <div className="absolute top-4 right-4">
+                      {/* Accuracy badge, project badge, and Three-dot menu */}
+                      <div className="absolute top-4 right-4 flex items-center gap-2">
+                        <Badge variant="secondary" className="text-xs bg-white/90 text-gray-800">
+                          {Math.round(blueprint.averageAccuracy)}% accuracy
+                        </Badge>
+                        {blueprint.projectId && (
+                          <Badge variant="outline" className="text-xs bg-white/90 text-gray-800">
+                            {getProjectName(blueprint.projectId)}
+                          </Badge>
+                        )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button

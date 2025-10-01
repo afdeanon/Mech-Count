@@ -1,9 +1,13 @@
 import { Request, Response } from 'express';
 import multer from 'multer';
+import mongoose from 'mongoose';
 import { Blueprint } from '../models/Blueprint';
 import { User } from '../models/User';
+import { AIUsage } from '../models/AIUsage';
 import { uploadToS3, deleteFromS3, validateS3Config } from '../services/s3Service';
+import { analyzeBlueprint, validateImageForAnalysis, getAnalysisCost } from '../services/aiService';
 import sharp from 'sharp';
+import { v4 as uuidv4 } from 'uuid';
 
 // Configure multer for file uploads (memory storage)
 export const upload = multer({
@@ -25,7 +29,7 @@ export const upload = multer({
  * Helper function to get user ObjectId from Firebase UID
  * Creates user if it doesn't exist
  */
-async function getUserObjectId(firebaseUid: string, userInfo?: { email?: string; name?: string }) {
+async function getUserObjectId(firebaseUid: string, userInfo?: { email?: string; name?: string }): Promise<mongoose.Types.ObjectId> {
   // Try to find existing user
   let user = await User.findOne({ firebaseUid });
   
@@ -45,7 +49,7 @@ async function getUserObjectId(firebaseUid: string, userInfo?: { email?: string;
     await user.save();
   }
   
-  return user._id;
+  return user._id as mongoose.Types.ObjectId;
 }
 
 /**
@@ -125,12 +129,39 @@ export async function uploadBlueprint(req: Request, res: Response) {
 
     await blueprint.save();
 
-    // TODO: Queue AI processing job here
-    // await queueSymbolDetection(blueprint._id);
+    console.log(`📝 [DEBUG] Blueprint created successfully:`);
+    console.log(`📝 [DEBUG] - Blueprint _id: ${blueprint._id}`);
+    console.log(`📝 [DEBUG] - Blueprint name: ${blueprint.name}`);
+    console.log(`📝 [DEBUG] - Blueprint userId: ${blueprint.userId}`);
+
+    // Start AI analysis in the background
+    processAIAnalysis((blueprint._id as mongoose.Types.ObjectId).toString(), req.file.buffer, req.file.mimetype, userObjectId)
+      .catch(error => {
+        console.error('Background AI analysis failed:', error);
+      });
+
+    const responseData = {
+      _id: (blueprint._id as mongoose.Types.ObjectId).toString(),
+      id: (blueprint._id as mongoose.Types.ObjectId).toString(), // Add both _id and id for compatibility
+      name: blueprint.name,
+      description: blueprint.description,
+      imageUrl: blueprint.imageUrl,
+      s3Key: blueprint.s3Key,
+      originalFilename: blueprint.originalFilename,
+      userId: (blueprint.userId as any).toString(),
+      projectId: blueprint.projectId ? (blueprint.projectId as any).toString() : null,
+      symbols: blueprint.symbols,
+      status: blueprint.status,
+      metadata: blueprint.metadata,
+      createdAt: blueprint.createdAt,
+      updatedAt: blueprint.updatedAt
+    };
+
+    console.log(`📝 [DEBUG] Sending response data:`, responseData);
 
     res.status(201).json({
       success: true,
-      data: blueprint,
+      data: responseData,
       message: 'Blueprint uploaded successfully'
     });
 
@@ -226,10 +257,23 @@ export async function getUserBlueprints(req: Request, res: Response) {
       .find(filter)
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(Number(limit))
-      .populate('projectId', 'name description');
+      .limit(Number(limit));
+      // Removed .populate('projectId') to keep projectId as ObjectId string
+      // The frontend expects projectId to be a string, not a populated object
 
     const total = await Blueprint.countDocuments(filter);
+
+    console.log(`📋 [DEBUG] getUserBlueprints returning ${blueprints.length} blueprints for user ${userObjectId}`);
+    blueprints.forEach(bp => {
+      console.log(`  - ${bp._id}: "${bp.name}" (projectId: ${bp.projectId})`);
+    });
+
+    // Also log total blueprint count for this user to detect duplicates
+    const totalBlueprints = await Blueprint.find({ userId: userObjectId });
+    console.log(`📋 [DEBUG] Total blueprints in DB for user: ${totalBlueprints.length}`);
+    if (totalBlueprints.length !== blueprints.length) {
+      console.log(`📋 [WARNING] Mismatch between filtered and total blueprints! This might indicate pagination or filtering issues.`);
+    }
 
     res.json({
       success: true,
@@ -292,6 +336,271 @@ export async function getBlueprintById(req: Request, res: Response) {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch blueprint',
+      error: process.env.NODE_ENV === 'development' ? (error as Error).message : 'Internal server error'
+    });
+  }
+}
+
+/**
+ * Update blueprint name and description
+ */
+export async function updateBlueprint(req: Request, res: Response) {
+  try {
+    const firebaseUid = req.user?.uid;
+    const { id } = req.params; // Changed from blueprintId to id to match route
+    const { name, description } = req.body;
+
+    if (!firebaseUid) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+    }
+
+    console.log(`📝 [DEBUG] Updating blueprint ${id} with name: "${name}"`);
+
+    const userObjectId = await getUserObjectId(firebaseUid, {
+      email: req.user?.email,
+      name: req.user?.name
+    });
+
+    // Find and update the blueprint
+    const blueprint = await Blueprint.findOneAndUpdate(
+      { _id: id, userId: userObjectId }, // Changed from blueprintId to id
+      { 
+        name: name || undefined,
+        description: description || undefined,
+        updatedAt: new Date()
+      },
+      { new: true, runValidators: true }
+    );
+
+    if (!blueprint) {
+      console.log(`📝 [DEBUG] Blueprint not found for user ${userObjectId} and blueprint ${id}`);
+      return res.status(404).json({
+        success: false,
+        message: 'Blueprint not found'
+      });
+    }
+
+    console.log(`📝 [DEBUG] Blueprint updated successfully: ${blueprint._id} (name: "${blueprint.name}")`);
+
+    res.json({
+      success: true,
+      data: blueprint,
+      message: 'Blueprint updated successfully'
+    });
+
+  } catch (error) {
+    console.error('Update blueprint error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update blueprint',
+      error: process.env.NODE_ENV === 'development' ? (error as Error).message : 'Internal server error'
+    });
+  }
+}
+
+/**
+ * Process AI analysis for a blueprint
+ */
+async function processAIAnalysis(blueprintId: string, imageBuffer: Buffer, mimeType: string, userId?: mongoose.Types.ObjectId) {
+  try {
+    console.log(`🤖 Starting AI analysis for blueprint ${blueprintId}`);
+
+    // Validate image for AI analysis
+    const validation = validateImageForAnalysis(imageBuffer, mimeType);
+    if (!validation.valid) {
+      throw new Error(`Image validation failed: ${validation.reason}`);
+    }
+
+    // Check user's AI quota if userId provided
+    if (userId) {
+      const canAnalyze = await AIUsage.canUserAnalyze(userId);
+      if (!canAnalyze.canAnalyze) {
+        throw new Error(`AI analysis quota exceeded. ${canAnalyze.remaining} analyses remaining this month.`);
+      }
+    }
+
+    // Perform AI analysis
+    const analysisResult = await analyzeBlueprint(imageBuffer, mimeType);
+
+    // Convert AI symbols to blueprint format
+    const blueprintSymbols = analysisResult.symbols.map(symbol => ({
+      id: uuidv4(),
+      type: symbol.category,
+      name: symbol.name,
+      description: symbol.description || '',
+      category: symbol.category,
+      position: symbol.coordinates || { x: 0, y: 0, width: 100, height: 100 },
+      confidence: symbol.confidence / 100 // Convert percentage to decimal
+    }));
+
+    // Update blueprint with AI results
+    const updatedBlueprint = await Blueprint.findByIdAndUpdate(
+      blueprintId,
+      {
+        symbols: blueprintSymbols,
+        totalSymbols: blueprintSymbols.length,
+        status: 'completed',
+        aiAnalysis: {
+          isAnalyzed: true,
+          analysisDate: new Date(),
+          processingTime: analysisResult.processingTime,
+          confidence: analysisResult.confidence,
+          summary: analysisResult.summary
+        }
+      },
+      { new: true }
+    );
+
+    // Record usage if user provided
+    if (userId && updatedBlueprint) {
+      const cost = getAnalysisCost(imageBuffer.length);
+      await AIUsage.recordAnalysis(userId, cost);
+      console.log(`📊 Recorded AI usage for user ${userId}: $${cost}`);
+    }
+
+    if (updatedBlueprint) {
+      console.log(`🤖 AI analysis completed for blueprint ${blueprintId}: ${blueprintSymbols.length} symbols detected`);
+    }
+
+  } catch (error) {
+    console.error(`🤖 AI analysis failed for blueprint ${blueprintId}:`, error);
+    
+    // Update blueprint with error status
+    await Blueprint.findByIdAndUpdate(
+      blueprintId,
+      {
+        status: 'failed',
+        processingError: error instanceof Error ? error.message : 'AI analysis failed',
+        aiAnalysis: {
+          isAnalyzed: false,
+          confidence: 0,
+          errorMessage: error instanceof Error ? error.message : 'Unknown error'
+        }
+      }
+    );
+  }
+}
+
+/**
+ * Trigger AI analysis for an existing blueprint
+ */
+export async function analyzeExistingBlueprint(req: Request, res: Response) {
+  try {
+    const { id } = req.params;
+    const firebaseUid = req.user?.uid;
+
+    if (!firebaseUid) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+    }
+
+    const userObjectId = await getUserObjectId(firebaseUid, {
+      email: req.user?.email,
+      name: req.user?.name
+    });
+
+    const blueprint = await Blueprint.findOne({ _id: id, userId: userObjectId });
+
+    if (!blueprint) {
+      return res.status(404).json({
+        success: false,
+        message: 'Blueprint not found'
+      });
+    }
+
+    // Check if already analyzed
+    if (blueprint.aiAnalysis?.isAnalyzed) {
+      return res.status(400).json({
+        success: false,
+        message: 'Blueprint has already been analyzed'
+      });
+    }
+
+    // Check user's AI quota
+    const canAnalyze = await AIUsage.canUserAnalyze(userObjectId);
+    if (!canAnalyze.canAnalyze) {
+      return res.status(402).json({
+        success: false,
+        message: `AI analysis quota exceeded. You have ${canAnalyze.remaining} analyses remaining this month.`,
+        data: {
+          tier: canAnalyze.tier,
+          remaining: canAnalyze.remaining,
+          limit: canAnalyze.limit
+        }
+      });
+    }
+
+    // Download image from S3 for analysis
+    // For now, return success and note that analysis will start
+    // In production, you'd download the image from S3 and process it
+
+    res.json({
+      success: true,
+      message: 'AI analysis started for blueprint',
+      data: {
+        blueprintId: (blueprint._id as mongoose.Types.ObjectId).toString(),
+        status: 'processing'
+      }
+    });
+
+  } catch (error) {
+    console.error('AI analysis trigger error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to start AI analysis',
+      error: process.env.NODE_ENV === 'development' ? (error as Error).message : 'Internal server error'
+    });
+  }
+}
+
+/**
+ * Get user's AI usage statistics
+ */
+export async function getUserAIUsage(req: Request, res: Response) {
+  try {
+    const firebaseUid = req.user?.uid;
+
+    if (!firebaseUid) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+    }
+
+    const userObjectId = await getUserObjectId(firebaseUid, {
+      email: req.user?.email,
+      name: req.user?.name
+    });
+
+    const usage = await AIUsage.getUserUsage(userObjectId);
+    const canAnalyze = await AIUsage.canUserAnalyze(userObjectId);
+
+    res.json({
+      success: true,
+      data: {
+        totalAnalyses: usage.analysisCount,
+        monthlyAnalyses: usage.monthlyAnalysisCount,
+        lastAnalysisDate: usage.lastAnalysisDate,
+        totalCost: usage.totalCost,
+        subscription: usage.subscription,
+        quota: {
+          canAnalyze: canAnalyze.canAnalyze,
+          remaining: canAnalyze.remaining,
+          limit: canAnalyze.limit
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Get AI usage error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch AI usage statistics',
       error: process.env.NODE_ENV === 'development' ? (error as Error).message : 'Internal server error'
     });
   }

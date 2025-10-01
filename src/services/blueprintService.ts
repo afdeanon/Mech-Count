@@ -1,6 +1,13 @@
 import { auth } from '@/config/firebase';
+import type { Blueprint } from '@/types';
 
 const API_BASE_URL = 'http://localhost:3000/api';
+
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+}
 
 // Helper function to get auth token
 async function getAuthToken(): Promise<string | null> {
@@ -126,6 +133,13 @@ export async function uploadBlueprint(
     console.log('📤 Upload response status:', response.status);
     const result = await response.json();
     console.log('📤 Upload response data:', result);
+    console.log('📤 Upload response data.data:', result.data);
+    
+    if (result.data) {
+      console.log('📤 Blueprint ID in response:', result.data._id || result.data.id);
+      console.log('📤 Blueprint object keys:', Object.keys(result.data));
+      console.log('📤 Full blueprint object:', JSON.stringify(result.data, null, 2));
+    }
     
     if (!response.ok) {
       throw new Error(result.message || 'Upload failed');
@@ -239,6 +253,50 @@ export async function deleteBlueprint(id: string): Promise<UploadResponse> {
     };
   }
 }
+
+// Update blueprint name and description
+export const updateBlueprint = async (blueprintId: string, updates: Partial<Blueprint>): Promise<ApiResponse<Blueprint>> => {
+  try {
+    console.log('� [UPDATE_BLUEPRINT] Service called with:');
+    console.log('🔧 [UPDATE_BLUEPRINT] blueprintId:', blueprintId);
+    console.log('🔧 [UPDATE_BLUEPRINT] updates:', updates);
+    
+    const token = await getAuthToken();
+    if (!token) {
+      throw new Error('No authentication token available');
+    }
+
+    const response = await fetch(`${API_BASE_URL}/blueprints/${blueprintId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(updates)
+    });
+
+    const data = await response.json();
+    
+    console.log('🔧 [UPDATE_BLUEPRINT] Response status:', response.status);
+    console.log('🔧 [UPDATE_BLUEPRINT] Response data:', data);
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Failed to update blueprint');
+    }
+
+    return {
+      success: true,
+      data: data.data,
+      message: data.message
+    };
+  } catch (error: any) {
+    console.error('Error updating blueprint:', error);
+    return {
+      success: false,
+      message: error.message
+    };
+  }
+};
 
 // Save an already processed blueprint to the backend
 export async function saveBlueprintToHistory(

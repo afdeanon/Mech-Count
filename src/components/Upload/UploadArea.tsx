@@ -1,11 +1,9 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, FileImage, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, FileImage, CheckCircle, AlertCircle, Brain } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Blueprint, MechanicalSymbol } from '@/types';
-import { symbolTypes } from '@/data/mockData';
-import { useApp } from '@/context/AppContext';
+import { Blueprint } from '@/types';
 import { uploadBlueprint, testBackendConnection } from '@/services/blueprintService';
 
 interface UploadAreaProps {
@@ -19,36 +17,19 @@ export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing 
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
-  const { dispatch } = useApp();
-
-  const generateMockSymbols = (): MechanicalSymbol[] => {
-    const count = 15 + Math.floor(Math.random() * 20);
-    const symbols: MechanicalSymbol[] = [];
-    
-    for (let i = 0; i < count; i++) {
-      const symbolType = symbolTypes[Math.floor(Math.random() * symbolTypes.length)];
-      symbols.push({
-        id: `symbol-${Date.now()}-${i}`,
-        type: symbolType.type,
-        name: symbolType.name,
-        position: {
-          x: Math.floor(Math.random() * 700),
-          y: Math.floor(Math.random() * 500),
-          width: 40 + Math.floor(Math.random() * 60),
-          height: 40 + Math.floor(Math.random() * 60)
-        },
-        confidence: 0.85 + Math.random() * 0.15
-      });
-    }
-    
-    return symbols;
-  };
 
   const processUpload = async (file: File) => {
     setIsProcessing(true);
     setUploadStatus('uploading');
     setProgress(0);
     setErrorMessage('');
+
+    // Add timeout to prevent hanging
+    const uploadTimeout = setTimeout(() => {
+      setErrorMessage('Upload timeout - processing is taking longer than expected. Please try again.');
+      setUploadStatus('error');
+      setIsProcessing(false);
+    }, 45000); // 45 second timeout
 
     try {
       // Step 1: Test backend connection
@@ -63,44 +44,38 @@ export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing 
         throw new Error('Please sign in to upload blueprints');
       }
 
-      // Step 2: Upload file
       setProgress(30);
-      const uploadResult = await uploadBlueprint(
-        file,
-        file.name.replace(/\.[^/.]+$/, ''),
-        'Uploaded blueprint with AI symbol detection'
-      );
 
-      if (!uploadResult.success) {
-        throw new Error(uploadResult.message || 'Upload failed');
-      }
+      // Step 2: Create local blueprint from file (session-only)
+      const blueprint: Blueprint = {
+        id: `temp-${Date.now()}`, // Temporary ID for session
+        name: file.name.replace(/\.[^/.]+$/, ''),
+        description: '',
+        imageUrl: URL.createObjectURL(file), // Create local URL for preview
+        uploadDate: new Date(),
+        symbols: [],
+        totalSymbols: 0,
+        averageAccuracy: 0,
+        status: 'processing',
+        aiAnalysis: {
+          isAnalyzed: false,
+          confidence: 0,
+          summary: 'Ready to save'
+        }
+      };
 
       setProgress(70);
 
-      // Step 3: Process the uploaded blueprint data
-      const uploadedBlueprint = uploadResult.data;
-      
-      // For now, add mock symbols since AI processing isn't implemented yet
-      const symbols = generateMockSymbols();
-      const blueprint: Blueprint = {
-        id: uploadedBlueprint.id || `blueprint-${Date.now()}`,
-        name: uploadedBlueprint.name || file.name.replace(/\.[^/.]+$/, ''),
-        description: uploadedBlueprint.description || 'Uploaded blueprint with AI symbol detection',
-        imageUrl: uploadedBlueprint.imageUrl || URL.createObjectURL(file),
-        uploadDate: new Date(uploadedBlueprint.createdAt || Date.now()),
-        symbols,
-        totalSymbols: symbols.length,
-        averageAccuracy: symbols.reduce((acc, s) => acc + s.confidence, 0) / symbols.length
-      };
+      // Step 3: Pass blueprint to parent for display (local state only)
+      onBlueprintUploaded(blueprint, file);
 
       setProgress(90);
 
-      // Step 4: Pass blueprint to parent without adding to history
-      // History will be updated only when user chooses to save or upload new
-      onBlueprintUploaded(blueprint, file);
-
       setProgress(100);
       setUploadStatus('success');
+
+      // Clear timeout on success
+      clearTimeout(uploadTimeout);
 
       setTimeout(() => {
         setIsProcessing(false);
@@ -109,6 +84,8 @@ export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing 
       }, 1000);
 
     } catch (error: any) {
+      // Clear timeout on error
+      clearTimeout(uploadTimeout);
       console.error('Upload error:', error);
       setErrorMessage(error.message || 'Upload failed');
       setUploadStatus('error');
@@ -138,12 +115,14 @@ export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing 
     return (
       <div className="space-y-6">
         <div className="glass-card p-8 text-center">
-          <div className="w-16 h-16 loading-spinner mx-auto mb-6" />
+          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Brain className="w-8 h-8 text-blue-500 animate-pulse" />
+          </div>
           <h3 className="text-xl font-semibold text-foreground mb-2">
-            Processing Your Blueprint
+            Processing Blueprint
           </h3>
           <p className="text-muted-foreground mb-6">
-            Our AI is analyzing your blueprint and detecting mechanical symbols...
+            Preparing your blueprint for preview...
           </p>
           
           <div className="max-w-md mx-auto space-y-3">
@@ -230,7 +209,7 @@ export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing 
             <p className="text-muted-foreground mb-4">
               {isDragReject
                 ? 'Please upload image files (PNG, JPG, JPEG, BMP, TIFF) or PDF documents'
-                : 'Drag and drop your blueprint file here, or click to browse'
+                : 'Upload your blueprint for AI-powered symbol detection and analysis'
               }
             </p>
             
@@ -244,7 +223,8 @@ export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing 
       </div>
 
       <div className="text-center text-sm text-muted-foreground">
-        <p>Supported formats: PNG, JPG, JPEG, BMP, TIFF, PDF • Max file size: 50MB</p>
+        <p>Supported formats: PNG, JPG, JPEG, BMP, TIFF, PDF • Max file size: 10MB</p>
+        <p className="mt-1 text-xs">AI analysis automatically detects mechanical symbols and components</p>
       </div>
     </div>
   );
