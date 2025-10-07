@@ -42,9 +42,50 @@ export const analyzeBlueprint = async (
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
     // Enhanced detailed prompt for mechanical symbol detection
-    const prompt = `What do you see in this image? Please describe it briefly.`;
+    const prompt = `Analyze this engineering blueprint/technical drawing to identify and locate all mechanical symbols present in the image.
 
-    console.log('🤖 Using simplified prompt to test image acceptance...');
+FOCUS ON THESE SYMBOL TYPES:
+- HVAC: FCU (Fan Coil Units), EF (Exhaust Fans), AHU (Air Handling Units), VAV boxes
+- Plumbing: Pumps, valves, fixtures, tanks, piping components  
+- Mechanical: Motors, gears, bearings, couplings, mechanical linkages
+- Electrical: Motor symbols, switches, control panels, sensors
+
+For each individual symbol instance (treat each occurrence separately):
+1. Identify the symbol name and provide a brief technical description
+2. Assess your confidence level in the detection (60-100%) - be conservative
+3. Categorize the symbol (hydraulic, pneumatic, mechanical, electrical, other)
+4. Provide location coordinates as percentages of image dimensions (0-100)
+
+IMPORTANT: 
+- Create separate entries for each symbol instance (don't group by type)
+- Only include symbols you can clearly identify with >60% confidence
+- Each symbol gets its own coordinates
+
+Return the results in this JSON structure:
+{
+  "symbols": [
+    {
+      "name": "Fan Coil Unit (FCU)",
+      "description": "HVAC unit for space heating and cooling",
+      "confidence": 90,
+      "category": "mechanical",
+      "coordinates": {"x": 25.5, "y": 30.2, "width": 8.1, "height": 6.3}
+    },
+    {
+      "name": "Exhaust Fan (EF)", 
+      "description": "Ventilation fan for air extraction",
+      "confidence": 85,
+      "category": "mechanical",
+      "coordinates": {"x": 65.8, "y": 45.7, "width": 6.0, "height": 6.0}
+    }
+  ],
+  "summary": "HVAC floor plan with mechanical ventilation systems",
+  "overallConfidence": 87
+}
+
+Respond with ONLY the JSON object, no additional text.`;
+
+    console.log('🤖 Using structured prompt for symbol detection...');
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
@@ -73,15 +114,15 @@ export const analyzeBlueprint = async (
     });
 
     const processingTime = Date.now() - startTime;
-    
+
     console.log('🤖 OpenAI API Response Status:', response.choices?.[0]?.finish_reason);
     console.log('🤖 OpenAI usage:', response.usage);
-    
+
     // Parse the AI response
     const aiResponse = response.choices[0]?.message?.content;
     console.log('🤖 Raw OpenAI Response:', aiResponse);
     console.log('🤖 Response length:', aiResponse?.length || 0);
-    
+
     if (!aiResponse) {
       throw new Error('No response from OpenAI Vision API');
     }
@@ -91,7 +132,7 @@ export const analyzeBlueprint = async (
     try {
       // Try multiple patterns to extract JSON
       let jsonString = aiResponse.trim();
-      
+
       // Remove markdown code blocks if present
       const codeBlockMatch = aiResponse.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
       if (codeBlockMatch) {
@@ -108,10 +149,10 @@ export const analyzeBlueprint = async (
           throw new Error('No JSON found in AI response');
         }
       }
-      
+
       analysisData = JSON.parse(jsonString);
       console.log('🤖 Successfully parsed JSON:', analysisData);
-      
+
     } catch (parseError) {
       console.error('Failed to parse AI response:', parseError);
       console.log('🤖 Full response for debugging:', aiResponse);
@@ -144,13 +185,13 @@ export const analyzeBlueprint = async (
       type: (error as any)?.type,
       status: (error as any)?.status
     });
-    
+
     // Enhanced fallback for development and testing
     const isDevelopment = process.env.NODE_ENV === 'development';
-    const isQuotaError = (error as any)?.code === 'insufficient_quota' || 
-                        (error as any)?.message?.includes('quota') ||
-                        (error as any)?.message?.includes('billing');
-    
+    const isQuotaError = (error as any)?.code === 'insufficient_quota' ||
+      (error as any)?.message?.includes('quota') ||
+      (error as any)?.message?.includes('billing');
+
     // Provide enhanced mock data for testing and development
     if (isDevelopment || isQuotaError) {
       console.log('🧪 Using enhanced mock AI analysis data');
@@ -217,12 +258,12 @@ export const analyzeBlueprint = async (
         analysisTimestamp: new Date(),
         processingTime: Date.now() - startTime,
         confidence: 87,
-        summary: isQuotaError 
+        summary: isQuotaError
           ? '🧪 Mock analysis: Detected complex hydraulic system with pump, valves, cylinder, and monitoring. (OpenAI quota/billing issue - using mock data)'
           : '🧪 Development mode: Detected hydraulic power unit with pressure control, flow regulation, and actuator components. This is mock data for testing.'
       };
     }
-    
+
     // Return a graceful fallback result for other errors
     return {
       symbols: [],
@@ -280,9 +321,9 @@ export const checkAIServiceHealth = async (): Promise<{ available: boolean; erro
 
     return { available: true };
   } catch (error) {
-    return { 
-      available: false, 
-      error: error instanceof Error ? error.message : 'Unknown error' 
+    return {
+      available: false,
+      error: error instanceof Error ? error.message : 'Unknown error'
     };
   }
 };
