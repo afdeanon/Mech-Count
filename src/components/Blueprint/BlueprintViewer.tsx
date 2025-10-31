@@ -1,5 +1,5 @@
-import { useState, useRef, useCallback } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, Move, Brain, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { ZoomIn, ZoomOut, RotateCcw, Move, Brain, Clock, CheckCircle, XCircle, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Blueprint } from '@/types';
@@ -15,7 +15,13 @@ export function BlueprintViewer({ blueprint, showSymbols = true }: BlueprintView
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [showSymbolOverlays, setShowSymbolOverlays] = useState(true);
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0, offsetX: 0, offsetY: 0 });
+  
   const containerRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   const handleZoomIn = () => {
     setZoom(prev => Math.min(prev * 1.2, 3));
@@ -46,6 +52,72 @@ export function BlueprintViewer({ blueprint, showSymbols = true }: BlueprintView
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
+  }, []);
+
+  // Calculate displayed image dimensions and position
+  const updateImageDimensions = useCallback(() => {
+    if (imageRef.current && wrapperRef.current) {
+      const imageRect = imageRef.current.getBoundingClientRect();
+      const wrapperRect = wrapperRef.current.getBoundingClientRect();
+      
+      setImageDimensions({
+        width: imageRect.width,
+        height: imageRect.height,
+        offsetX: imageRect.left - wrapperRect.left,
+        offsetY: imageRect.top - wrapperRect.top
+      });
+      
+      console.log('📐 Image dimensions updated:', {
+        displayedWidth: imageRect.width,
+        displayedHeight: imageRect.height,
+        offsetX: imageRect.left - wrapperRect.left,
+        offsetY: imageRect.top - wrapperRect.top
+      });
+    }
+  }, []);
+
+  // Handle image load
+  const handleImageLoad = useCallback(() => {
+    setImageLoaded(true);
+    updateImageDimensions();
+  }, [updateImageDimensions]);
+
+  // Update dimensions on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (imageLoaded) {
+        updateImageDimensions();
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [imageLoaded, updateImageDimensions]);
+
+  // Helper function to convert percentage coordinates to pixels based on displayed image size
+  const convertPercentageToPixels = useCallback((percentageCoords: { x: number; y: number; width: number; height: number }) => {
+    if (!imageRef.current) {
+      console.warn('🚫 Image ref not available for coordinate conversion');
+      return { x: 0, y: 0, width: 0, height: 0 };
+    }
+
+    const displayedWidth = imageRef.current.clientWidth;
+    const displayedHeight = imageRef.current.clientHeight;
+
+    const pixelCoords = {
+      x: (percentageCoords.x / 100) * displayedWidth,
+      y: (percentageCoords.y / 100) * displayedHeight,
+      width: (percentageCoords.width / 100) * displayedWidth,
+      height: (percentageCoords.height / 100) * displayedHeight
+    };
+
+    console.log(`📐 Converting coordinates for symbol:`, {
+      percentage: percentageCoords,
+      displaySize: { width: displayedWidth, height: displayedHeight },
+      pixels: pixelCoords
+    });
+
+    return pixelCoords;
   }, []);
 
   const getSymbolColor = (category: string) => {
@@ -100,6 +172,17 @@ export function BlueprintViewer({ blueprint, showSymbols = true }: BlueprintView
         >
           <RotateCcw className="w-4 h-4" />
         </Button>
+        {blueprint.symbols.length > 0 && (
+          <Button
+            size="sm"
+            variant={showSymbolOverlays ? "default" : "secondary"}
+            onClick={() => setShowSymbolOverlays(!showSymbolOverlays)}
+            className="glass"
+            title={showSymbolOverlays ? "Hide symbol boxes" : "Show symbol boxes"}
+          >
+            {showSymbolOverlays ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+          </Button>
+        )}
       </div>
 
       {/* AI Analysis Status */}
@@ -138,19 +221,29 @@ export function BlueprintViewer({ blueprint, showSymbols = true }: BlueprintView
         >
           {/* Blueprint Image */}
           <img
+            ref={imageRef}
             src={blueprint.imageUrl}
             alt={blueprint.name}
             className="max-w-none select-none"
             draggable={false}
-            style={{ width: '800px', height: '600px' }}
+            onLoad={handleImageLoad}
+            style={{ 
+              width: '800px', 
+              height: 'auto', // Preserve aspect ratio
+              objectFit: 'contain' // Prevent stretching
+            }}
           />
 
           {/* Symbol Overlays */}
-          {showSymbols && blueprint.symbols.map((symbol) => {
+          {showSymbols && showSymbolOverlays && blueprint.symbols.map((symbol) => {
+            // Convert percentage coordinates to pixels based on actual displayed image size
+            const pixelPosition = convertPercentageToPixels(symbol.position);
+            
             console.log('🎯 Rendering symbol:', {
               id: symbol.id,
               name: symbol.name,
-              position: symbol.position,
+              percentagePosition: symbol.position,
+              pixelPosition: pixelPosition,
               category: symbol.category,
               confidence: symbol.confidence
             });
@@ -158,25 +251,49 @@ export function BlueprintViewer({ blueprint, showSymbols = true }: BlueprintView
             return (
               <div
                 key={symbol.id}
-                className="absolute border-2 bg-opacity-20 rounded-sm hover:bg-opacity-30 transition-all duration-200"
+                className="absolute border-3 bg-opacity-25 rounded-md hover:bg-opacity-40 transition-all duration-200 cursor-pointer shadow-lg"
                 style={{
-                  left: symbol.position.x,
-                  top: symbol.position.y,
-                  width: symbol.position.width,
-                  height: symbol.position.height,
+                  left: `${pixelPosition.x}px`,
+                  top: `${pixelPosition.y}px`,
+                  width: `${pixelPosition.width}px`,
+                  height: `${pixelPosition.height}px`,
                   borderColor: getSymbolColor(symbol.category || 'other'),
-                  backgroundColor: getSymbolColor(symbol.category || 'other') + '33'
+                  backgroundColor: getSymbolColor(symbol.category || 'other') + '40',
+                  borderWidth: '3px',
+                  borderStyle: 'solid'
                 }}
                 title={`${symbol.name}${symbol.description ? ': ' + symbol.description : ''} (${Math.round(symbol.confidence * 100)}% confidence)`}
               >
+                {/* Confidence Badge */}
                 <div
-                  className="text-xs font-mono text-white px-1 py-0.5 rounded-tl"
-                  style={{ backgroundColor: getSymbolColor(symbol.category || 'other') }}
+                  className="absolute -top-6 left-0 text-xs font-bold text-white px-2 py-1 rounded-t-md shadow-sm"
+                  style={{ 
+                    backgroundColor: getSymbolColor(symbol.category || 'other'),
+                    minWidth: 'fit-content'
+                  }}
                 >
                   {Math.round(symbol.confidence * 100)}%
                 </div>
-                <div className="text-xs text-gray-800 px-1 py-0.5 bg-white bg-opacity-90 rounded-br max-w-20 truncate">
+                
+                {/* Symbol Name Label */}
+                <div 
+                  className="absolute -bottom-6 left-0 text-xs font-medium text-gray-900 px-2 py-1 rounded-b-md shadow-sm max-w-32 truncate"
+                  style={{ 
+                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                    border: `1px solid ${getSymbolColor(symbol.category || 'other')}`
+                  }}
+                >
                   {symbol.name}
+                </div>
+                
+                {/* Center crosshair for precise positioning */}
+                <div 
+                  className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                >
+                  <div 
+                    className="w-3 h-3 rounded-full border-2 border-white shadow-sm"
+                    style={{ backgroundColor: getSymbolColor(symbol.category || 'other') }}
+                  />
                 </div>
               </div>
             );

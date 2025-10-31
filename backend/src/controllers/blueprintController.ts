@@ -470,19 +470,31 @@ async function processAIAnalysis(blueprintId: string, imageBuffer: Buffer, mimeT
       summary: analysisResult.summary
     });
 
-    // Convert AI symbols to blueprint format
-    const blueprintSymbols = analysisResult.symbols.map(symbol => ({
-      id: uuidv4(),
-      type: symbol.category,
-      name: symbol.name,
-      description: symbol.description || '',
-      category: symbol.category,
-      position: symbol.coordinates || { x: 0, y: 0, width: 100, height: 100 },
-      confidence: symbol.confidence / 100 // Convert percentage to decimal
-    }));
+    // Convert AI symbols to blueprint format (keep percentages for accuracy)
+    const blueprintSymbols = analysisResult.symbols.map(symbol => {
+      // Keep coordinates as percentages for responsive scaling in frontend
+      const coords = symbol.coordinates || { x: 0, y: 0, width: 5, height: 5 };
+      
+      console.log(`🔍 Processing symbol "${symbol.name}" - AI coordinates: (${coords.x}%, ${coords.y}%) - confidence: ${symbol.confidence}`);
+      
+      return {
+        id: uuidv4(),
+        type: symbol.category,
+        name: symbol.name,
+        description: symbol.description || '',
+        category: symbol.category,
+        position: {
+          x: coords.x,        // Keep as percentage (0-100)
+          y: coords.y,        // Keep as percentage (0-100)
+          width: coords.width,   // Keep as percentage (0-100)
+          height: coords.height  // Keep as percentage (0-100)
+        },
+        confidence: symbol.confidence // Already converted to decimal in aiService
+      };
+    });
     
-    console.log(`📝 Converted to ${blueprintSymbols.length} blueprint symbols:`, 
-      blueprintSymbols.map(s => ({ name: s.name, confidence: s.confidence }))
+    console.log(`📝 Converted to ${blueprintSymbols.length} blueprint symbols with percentage coordinates:`, 
+      blueprintSymbols.map(s => ({ name: s.name, confidence: s.confidence, position: s.position }))
     );
 
     // Update blueprint with AI results
