@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import sharp from 'sharp';
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -68,130 +69,121 @@ export const analyzeBlueprint = async (
     const base64Image = imageBuffer.toString('base64');
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
-    // Enhanced detailed prompt for mechanical symbol detection
-    const prompt = `Analyze this mechanical blueprint to detect ALL mechanical symbols by following text labels to their components.
+    // Utility: clamp and sanitize boxes (percentages)
+    const clampBox = (coords: any) => {
+      const safe = coords || {};
+      const width = Math.min(12, Math.max(3, Number(safe.width ?? 7)));
+      const height = Math.min(12, Math.max(3, Number(safe.height ?? 7)));
+      const x = Math.min(100, Math.max(0, Number(safe.x ?? 50)));
+      const y = Math.min(100, Math.max(0, Number(safe.y ?? 50)));
+      return { x, y, width, height };
+    };
 
-YOUR TASK:
-1. Find ALL text labels that identify mechanical components (pumps, valves, fans, motors, etc.)
-2. Follow each label's arrow or line to the mechanical component it identifies
-3. Place detection coordinates at the mechanical component location (where arrow points), NOT at the text label
-4. Include ALL mechanical components that have readable labels, regardless of outline color
+    // Optional recenter using local darkest pixel (outline proxy) inside a crop around predicted center
+    const recenterBox = async (
+      box: { x: number; y: number; width: number; height: number },
+      meta: { width?: number; height?: number }
+    ) => {
+      const imgW = meta.width || 1000;
+      const imgH = meta.height || 1000;
 
-DETECTION APPROACH:
-- Scan the entire blueprint thoroughly for any text that could identify mechanical equipment
-- Look for arrows, lines, or simple proximity connections between labels and components
-- Include components with black, dark gray, or even medium gray outlines if clearly labeled
-- Focus on finding mechanical/HVAC/electrical equipment, not room labels or construction details
+      const cxPx = (box.x / 100) * imgW;
+      const cyPx = (box.y / 100) * imgH;
+      const cropSize = Math.max(imgW, imgH) * 0.16; // small neighborhood
+      const size = Math.max(8, Math.min(256, Math.round(cropSize))); // cap for performance
+      const left = Math.max(0, Math.min(imgW - size, Math.round(cxPx - size / 2)));
+      const top = Math.max(0, Math.min(imgH - size, Math.round(cyPx - size / 2)));
 
-COORDINATE REQUIREMENTS:
-- Provide coordinates as percentages (0-100) of image dimensions
-- Place x,y at the CENTER of the mechanical component
-- Width and height should encompass the entire component
-- Ensure bounding boxes cover the actual mechanical parts, not the text labels
+      try {
+        const region = await sharp(imageBuffer)
+          .extract({ left, top, width: size, height: size })
+          .greyscale()
+          .raw()
+          .toBuffer();
 
-IMPORTANT GUIDELINES:
-- Look for ALL mechanical equipment labels, even small or unclear ones
-- Include components with any level of gray outline if they have clear labels
-- Don't skip potential symbols just because they're in gray background areas
-- Follow any type of connecting line between labels and components
-- Aim to detect as many legitimate mechanical components as possible
+        // Find darkest pixel (minimum intensity) as proxy for outline/edge
+        let minVal = 256;
+        let minIdx = 0;
+        for (let i = 0; i < region.length; i++) {
+          const v = region[i];
+          if (v < minVal) {
+            minVal = v;
+            minIdx = i;
+          }
+        }
 
-COMMON MECHANICAL LABELS TO LOOK FOR:
-- FCU, AHU, EF, SF (HVAC equipment)
-- P-1, PUMP, V-1, VALVE (plumbing)
-- M-1, MOTOR, FAN (mechanical)
-- Numbered variations (FCU-01, PUMP-A, etc.)
+        const px = minIdx % size;
+        const py = Math.floor(minIdx / size);
+        const newCx = left + px;
+        const newCy = top + py;
 
-CONFIDENCE SCORING (50-100%):
-- 90-100%: Crystal clear label and component connection
-- 80-89%: Clear label, good component visibility
-- 70-79%: Readable label, identifiable component
-- 60-69%: Small but readable label, recognizable component
-- 50-59%: Challenging but identifiable mechanical equipment
+        return clampBox({
+          x: (newCx / imgW) * 100,
+          y: (newCy / imgH) * 100,
+          width: box.width,
+          height: box.height
+        });
+      } catch (err) {
+        // If recenter fails, return clamped original
+        return clampBox(box);
+      }
+    };
 
-ARROW FOLLOWING WITH COLOR FILTERING:
-- Follow arrows from text labels to their endpoints
-- At the arrow endpoint, look for the BLACK-OUTLINED mechanical component
-- If there are overlapping gray and black elements, choose ONLY the black-outlined one
-- Ignore gray shapes even if they're geometrically similar to mechanical symbols
-- Ensure the detected component has clear black boundaries
+    // Enhanced detailed prompt for mechanical symbol detection with coordinate correction
+    const prompt = `Analyze this mechanical/HVAC blueprint. Find all labeled mechanical components and return precise coordinates.
 
-IMPORTANT: MAXIMIZE DETECTION while maintaining accuracy:
-- INCLUDE components with readable labels even if outline contrast isn't perfect
-- INCLUDE small labels that are still legible even if surrounded by gray
-- INCLUDE components where the arrow connection is clear even if outline is grayish
-- EXAMINE every potential label-arrow-component combination carefully
-- PRIORITIZE detecting legitimate mechanical components over strict outline color filtering
-- ONLY exclude obvious background elements, construction details, or room labels
+YOUR TASK
+1) Find EVERY text label for mechanical/HVAC/electrical components (FCU, EF, SF, AHU, PUMP, VALVE, MOTOR, etc.).
+2) Follow the arrow/line from each label to the actual component.
+3) Place the bounding box on the component itself (arrow endpoint), NOT on the label.
+4) Return coordinates as percentages of the full image (0-100), origin at TOP-LEFT.
 
-DETECTION PRIORITY SYSTEM:
-1. 🥇 BLACK-OUTLINED components with clear labels and arrows = DETECT
-2. 🥈 DARK-OUTLINED components with clear labels and arrows = DETECT  
-3. 🚫 GRAY-OUTLINED shapes regardless of labels = IGNORE COMPLETELY
-4. 🚫 FADED or low-contrast elements = IGNORE COMPLETELY
+COORDINATE RULES (MANDATORY)
+- x,y are the CENTER of the component in %, from the top-left corner.
+- width,height are the component span in %, typically 3–15%. If outside 2–20%, recheck and correct.
+- Left half → x < 50. Right half → x > 50. Top half → y < 50. Bottom half → y > 50. If this quadrant check fails, adjust.
+- Visual check: Imagine the box on the image. If it would miss the component, MOVE and RESIZE until it covers the symbol body.
 
-For each UNIQUE part type (by label name):
-1. Extract the exact label text (part name)
-2. Follow the arrow/line from the label to find the actual mechanical component
-3. Place coordinates at the MECHANICAL COMPONENT location where the arrow points
-4. Count total instances of this part type in the blueprint
-5. Infer the category from the name:
-   - HVAC: fans, coils, air handlers, dampers, diffusers, FCU, EF, AHU
-   - Plumbing: pumps, valves, pipes, fixtures, tanks, water systems
-   - Electrical: motors, panels, switches, sensors, controls
-   - Mechanical: gears, bearings, couplings, linkages, drives
-   - Structural: beams, columns, supports, frames
-   - Other: if unclear or doesn't fit above categories
-6. Provide coordinates for EACH individual instance as percentages (0-100) AT THE MECHANICAL COMPONENT LOCATION (where the arrow points)
-7. Confidence level (50-100%) based on label clarity and part visibility - USE FLEXIBLE CONFIDENCE SCORES:
-   - 90-100%: Crystal clear label, obvious arrow, perfect black outline, no ambiguity
-   - 80-89%: Clear label and arrow, good outline (black or dark gray), minor uncertainty
-   - 70-79%: Readable label, identifiable arrow, decent outline quality (any contrast level)
-   - 60-69%: Small but readable label, traceable arrow, recognizable component shape
-   - 50-59%: Challenging to read but identifiable label, component appears mechanical
+DETECTION WORKFLOW (DO THIS IN ORDER)
+1) Grid scan: mentally split image into 3x3; scan every cell for labels.
+2) For each label: trace arrow → stop at arrowhead → place box on the component outline.
+3) Size sanity: width/height 3–15% is typical. If much larger/smaller, re-measure.
+4) Quadrant sanity: verify x/y against component location (left/right/top/bottom).
+5) Final verify pass: ensure every box truly covers the component, not the label.
 
-COORDINATE PRECISION REQUIREMENTS:
-- Measure the EXACT CENTER of the mechanical component (not edges)
-- X coordinate: horizontal center of the component as percentage of total image width
-- Y coordinate: vertical center of the component as percentage of total image height  
-- Width: full horizontal span of the component (percentage of image width)
-- Height: full vertical span of the component (percentage of image height)
-- Ensure the bounding box fully encompasses the entire mechanical symbol
-- Double-check coordinates by visually confirming the box would cover the component
+COMMON LABELS
+FCU/FCU-1/2/3, AHU, EF/EF-1/2/3, SF, P/P-1/2, PUMP, V/V-1/2, VALVE, M/M-1, MOTOR.
 
-CRITICAL REQUIREMENTS:
-- CREATE a SEPARATE entry for EACH individual labeled part instance
-- PRIORITIZE DETECTION COMPLETENESS: Aim to find all 9 mechanical symbols if they exist
-- INCLUDE components with small/unclear labels if arrow connection is identifiable
-- USE the EXACT text from the label as the part name (even if partially readable)
-- PLACE coordinates at the mechanical component (arrow endpoint), NOT the text label
-- EXAMINE gray areas carefully for partially obscured but legitimate mechanical components
-- BALANCE strict filtering with comprehensive detection - err on side of inclusion for legitimate mechanical parts
-- FOCUS on mechanical/HVAC/electrical components, but don't exclude due to outline color alone
+CATEGORY MAP
+- hvac: FCU, AHU, EF, SF, fans, coils, air handlers, dampers, diffusers
+- plumbing: pumps, valves, pipes, fixtures, tanks, water systems (P, PUMP, V, VALVE)
+- electrical: motors, panels, switches, sensors, controls (M, MOTOR)
+- mechanical: gears, bearings, couplings, drives
+- structural: beams, columns, supports
+- other: unclear
 
-Return in this JSON structure:
+CONFIDENCE (50–100%)
+- 90–100: Clear label+arrow, outline obvious, coordinates verified to cover component.
+- 75–89: Good label+arrow, minor uncertainty in box size/placement.
+- 50–74: Detected but coordinates somewhat estimated—lower confidence accordingly.
+
+COORDINATE CORRECTION EXAMPLES
+- Label top-left, component mid-right: coords should be around x ~70, y ~45, not near the label. Adjust if your first guess is near the label.
+- Component near bottom edge: y must be > 70; if you got y ~20, you placed it on the label—move down.
+- Box too big: if width or height > 20%, shrink to fit the component outline.
+
+REQUIRED FIELDS PER SYMBOL
+name (exact label text), description, confidence, category, coordinates {x,y,width,height} in %.
+
+STRICT JSON ONLY
 {
-  "symbols": [
-    {
-      "name": "FCU",
-      "description": "Fan Coil Unit - HVAC component with clear label connection",
-      "confidence": 85,
-      "category": "hvac",
-      "coordinates": {"x": 25.5, "y": 30.2, "width": 8.0, "height": 6.0}
-    },
-    {
-      "name": "PUMP",
-      "description": "Pump - mechanical component with identifiable label",
-      "confidence": 78,
-      "category": "hydraulic",
-      "coordinates": {"x": 60.1, "y": 40.5, "width": 6.0, "height": 4.0}
-    }
-  ],
-  "summary": "Found X mechanical components with labeled connections",
-  "overallConfidence": 82
+  "symbols": [ { "name": "FCU-1", "description": "...", "confidence": 90, "category": "hvac", "coordinates": {"x": 25.0, "y": 18.0, "width": 7.0, "height": 6.0} } ],
+  "summary": "Found X components with verified coordinates",
+  "overallConfidence": 88
 }
 
-Focus on SIMPLE COMPREHENSIVE DETECTION: Find all labeled mechanical components by following text labels to their connected equipment. Prioritize completeness and accuracy over complex analysis methods.`;
+Return ONLY JSON. No markdown.`;
+
 
     console.log('🤖 Using label-focused prompt for symbol detection...');
 
@@ -289,9 +281,11 @@ Focus on SIMPLE COMPREHENSIVE DETECTION: Find all labeled mechanical components 
       };
     }
 
+    // Get image metadata once for recentering
+    const meta = await sharp(imageBuffer).metadata();
+
     // Structure the final result - map AI response to DetectedSymbol interface
-    const result: SymbolAnalysisResult = {
-      symbols: (analysisData.symbols || []).map((symbol: any) => {
+    const symbolsArray = await Promise.all((analysisData.symbols || []).map(async (symbol: any) => {
         // Handle confidence conversion more carefully
         let confidence = symbol.confidence || 0;
         
@@ -314,20 +308,24 @@ Focus on SIMPLE COMPREHENSIVE DETECTION: Find all labeled mechanical components 
           confidence = 0.5; // Set lower minimum to catch more symbols
         }
         
+        const clamped = clampBox(symbol.coordinates);
+        const recentered = await recenterBox(clamped, meta);
+
         return {
           name: symbol.name || 'Unknown Component',
           description: symbol.description || '',
           confidence: confidence,
           category: mapCategoryToExpectedFormat(symbol.category) as any,
-          coordinates: symbol.coordinates ? {
-            x: symbol.coordinates.x || 0,
-            y: symbol.coordinates.y || 0,
-            width: symbol.coordinates.width || 5,
-            height: symbol.coordinates.height || 5
-          } : undefined
+          coordinates: recentered
         };
-      }),
-      totalSymbols: (analysisData.symbols || []).length,
+      }));
+
+    // Filter out obviously bad boxes after clamping
+    const symbols = symbolsArray.filter((s: any) => Number.isFinite(s.coordinates.x) && Number.isFinite(s.coordinates.y));
+
+    const result: SymbolAnalysisResult = {
+      symbols,
+      totalSymbols: symbols.length,
       analysisTimestamp: new Date(),
       processingTime,
       confidence: analysisData.overallConfidence || 0,
