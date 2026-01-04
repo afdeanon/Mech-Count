@@ -33,14 +33,14 @@ export interface SymbolAnalysisResult {
  */
 function mapCategoryToExpectedFormat(category: string): 'hydraulic' | 'pneumatic' | 'mechanical' | 'electrical' | 'other' {
   if (!category) return 'other';
-  
+
   const lowerCategory = category.toLowerCase();
-  
+
   // Map common HVAC/plumbing terms to appropriate categories
   if (lowerCategory.includes('hvac') || lowerCategory.includes('plumbing')) {
     return 'hydraulic'; // Most HVAC/plumbing systems use hydraulics
   }
-  
+
   // Direct mappings
   const categoryMap: { [key: string]: 'hydraulic' | 'pneumatic' | 'mechanical' | 'electrical' | 'other' } = {
     'hydraulic': 'hydraulic',
@@ -51,7 +51,7 @@ function mapCategoryToExpectedFormat(category: string): 'hydraulic' | 'pneumatic
     'plumbing': 'hydraulic',
     'structural': 'mechanical'
   };
-  
+
   return categoryMap[lowerCategory] || 'other';
 }
 
@@ -79,7 +79,7 @@ export const analyzeBlueprint = async (
       return { x, y, width, height };
     };
 
-    // Optional recenter using local darkest pixel (outline proxy) inside a crop around predicted center
+    // Optional recenter using Sobel edge magnitude + centroid to better lock onto outlines
     const recenterBox = async (
       box: { x: number; y: number; width: number; height: number },
       meta: { width?: number; height?: number }
@@ -87,102 +87,234 @@ export const analyzeBlueprint = async (
       const imgW = meta.width || 1000;
       const imgH = meta.height || 1000;
 
-      const cxPx = (box.x / 100) * imgW;
-      const cyPx = (box.y / 100) * imgH;
-      const cropSize = Math.max(imgW, imgH) * 0.16; // small neighborhood
-      const size = Math.max(8, Math.min(256, Math.round(cropSize))); // cap for performance
-      const left = Math.max(0, Math.min(imgW - size, Math.round(cxPx - size / 2)));
-      const top = Math.max(0, Math.min(imgH - size, Math.round(cyPx - size / 2)));
+      const centerToPercent = (px: number, py: number) => clampBox({
+        x: (px / imgW) * 100,
+        y: (py / imgH) * 100,
+        width: box.width,
+        height: box.height
+      });
 
-      try {
+      // Try with a tighter crop first; expand once if edges are weak
+      const attempt = async (scale: number) => {
+        const cxPx = (box.x / 100) * imgW;
+        const cyPx = (box.y / 100) * imgH;
+        const base = Math.max(imgW, imgH) * scale;
+        const size = Math.max(64, Math.min(256, Math.round(base))); // keep small for speed
+        const left = Math.max(0, Math.min(imgW - size, Math.round(cxPx - size / 2)));
+        const top = Math.max(0, Math.min(imgH - size, Math.round(cyPx - size / 2)));
+
         const region = await sharp(imageBuffer)
           .extract({ left, top, width: size, height: size })
           .greyscale()
           .raw()
           .toBuffer();
 
-        // Find darkest pixel (minimum intensity) as proxy for outline/edge
-        let minVal = 256;
-        let minIdx = 0;
-        for (let i = 0; i < region.length; i++) {
-          const v = region[i];
-          if (v < minVal) {
-            minVal = v;
-            minIdx = i;
+        // Sobel edge magnitude (3x3) to focus on outlines, not dark text
+        const gx = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
+        const gy = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
+        const mag: number[] = new Array(size * size).fill(0);
+        for (let y = 1; y < size - 1; y++) {
+          for (let x = 1; x < size - 1; x++) {
+            let sx = 0;
+            let sy = 0;
+            let k = 0;
+            for (let ky = -1; ky <= 1; ky++) {
+              for (let kx = -1; kx <= 1; kx++) {
+                const v = region[(y + ky) * size + (x + kx)];
+                sx += gx[k] * v;
+                sy += gy[k] * v;
+                k++;
+              }
+            }
+            const m = Math.abs(sx) + Math.abs(sy); // L1 magnitude to avoid sqrt
+            mag[y * size + x] = m;
           }
         }
 
-        const px = minIdx % size;
-        const py = Math.floor(minIdx / size);
-        const newCx = left + px;
-        const newCy = top + py;
+        // Mask top band (likely label text) to reduce pull toward labels
+        const maskCut = Math.floor(size * 0.25);
+        for (let y = 0; y < maskCut; y++) {
+          for (let x = 0; x < size; x++) mag[y * size + x] = 0;
+        }
 
-        return clampBox({
-          x: (newCx / imgW) * 100,
-          y: (newCy / imgH) * 100,
-          width: box.width,
-          height: box.height
-        });
-      } catch (err) {
-        // If recenter fails, return clamped original
+        // Use percentile cutoff to stay robust when max is an outlier
+        const mags = mag.slice().sort((a, b) => a - b);
+        const pIdx = Math.max(0, Math.min(mags.length - 1, Math.floor(mags.length * 0.82)));
+        const cutoff = mags[pIdx] || 0;
+
+        let sumW = 0;
+        let sumX = 0;
+        let sumY = 0;
+        for (let y = 0; y < size; y++) {
+          for (let x = 0; x < size; x++) {
+            const m = mag[y * size + x];
+            if (m >= cutoff) {
+              sumW += m;
+              sumX += m * x;
+              sumY += m * y;
+            }
+          }
+        }
+
+        if (sumW > 0) {
+          const px = sumX / sumW;
+          const py = sumY / sumW;
+          return centerToPercent(left + px, top + py);
+        }
+
+        // Fallback: darkest-pixel centroid within unmasked area
+        let minVal = 256;
+        for (let i = maskCut * size; i < region.length; i++) {
+          if (region[i] < minVal) minVal = region[i];
+        }
+        let darkW = 0;
+        let darkX = 0;
+        let darkY = 0;
+        for (let y = maskCut; y < size; y++) {
+          for (let x = 0; x < size; x++) {
+            const v = region[y * size + x];
+            if (v === minVal) {
+              darkW += 1;
+              darkX += x;
+              darkY += y;
+            }
+          }
+        }
+        if (darkW > 0) {
+          const px = darkX / darkW;
+          const py = darkY / darkW;
+          return centerToPercent(left + px, top + py);
+        }
+
+        return null; // signal weak edges
+      };
+
+      try {
+        const first = await attempt(0.08); // tighter crop
+        if (first) return first;
+
+        const second = await attempt(0.12); // expand once if no edges found
+        if (second) return second;
+
+        return clampBox(box);
+      } catch {
         return clampBox(box);
       }
     };
 
     // Enhanced detailed prompt for mechanical symbol detection with coordinate correction
-    const prompt = `Analyze this mechanical/HVAC blueprint. Find all labeled mechanical components and return precise coordinates.
+    const prompt = `You are analyzing a mechanical/HVAC blueprint. Your goal is to find ALL labeled mechanical components and return their precise coordinates.
 
-YOUR TASK
-1) Find EVERY text label for mechanical/HVAC/electrical components (FCU, EF, SF, AHU, PUMP, VALVE, MOTOR, etc.).
-2) Follow the arrow/line from each label to the actual component.
-3) Place the bounding box on the component itself (arrow endpoint), NOT on the label.
-4) Return coordinates as percentages of the full image (0-100), origin at TOP-LEFT.
+⚠️ CRITICAL: You MUST find EVERY labeled component in the image. Scan systematically from top to bottom, left to right. Do not stop after finding a few - continue scanning until you've covered the entire blueprint.
 
-COORDINATE RULES (MANDATORY)
-- x,y are the CENTER of the component in %, from the top-left corner.
-- width,height are the component span in %, typically 3–15%. If outside 2–20%, recheck and correct.
-- Left half → x < 50. Right half → x > 50. Top half → y < 50. Bottom half → y > 50. If this quadrant check fails, adjust.
-- Visual check: Imagine the box on the image. If it would miss the component, MOVE and RESIZE until it covers the symbol body.
+STEP-BY-STEP PROCESS (FOLLOW IN ORDER):
 
-DETECTION WORKFLOW (DO THIS IN ORDER)
-1) Grid scan: mentally split image into 3x3; scan every cell for labels.
-2) For each label: trace arrow → stop at arrowhead → place box on the component outline.
-3) Size sanity: width/height 3–15% is typical. If much larger/smaller, re-measure.
-4) Quadrant sanity: verify x/y against component location (left/right/top/bottom).
-5) Final verify pass: ensure every box truly covers the component, not the label.
+STEP 1: SCAN FOR LABELS (SYSTEMATIC APPROACH)
+Divide the image into a mental grid and scan each section thoroughly:
+- Top row: left to right, looking for ALL labels
+- Middle rows: left to right, looking for ALL labels  
+- Bottom row: left to right, looking for ALL labels
 
-COMMON LABELS
-FCU/FCU-1/2/3, AHU, EF/EF-1/2/3, SF, P/P-1/2, PUMP, V/V-1/2, VALVE, M/M-1, MOTOR.
+Search for text labels of mechanical/HVAC/electrical components:
+- FCU, FCU-1, FCU-2, FCU-3, FCU-01, FCU-02
+- EF, EF-1, EF-2, EF-3, EF-01, EF-02
+- SF, SF-1, SF-2, SF-01, SF-02
+- AHU, AHU-1, AHU-2
+- P, P-1, P-2, PUMP, PUMP-A, PUMP-B
+- V, V-1, V-2, VALVE
+- M, M-1, M-2, MOTOR
+- Any numbered or lettered variations of mechanical equipment labels
 
-CATEGORY MAP
+STEP 2: TRACE TO COMPONENT
+For each label found:
+- If there's an arrow/leader line: follow it to the component symbol
+- If no arrow: the component symbol is typically very close to the label
+- The component is the graphical symbol (circle, rectangle, fan icon, etc.), NOT the text
+
+STEP 3: PLACE BOUNDING BOX
+Place the box ON THE COMPONENT SYMBOL ITSELF:
+- x, y = center of the symbol (%, from top-left corner)
+- width, height = size of the symbol (typically 3-12%)
+- DO NOT place the box on the text label
+
+STEP 4: VERIFY COORDINATES
+Check each box placement:
+- Left side of image → x should be < 50
+- Right side of image → x should be > 50  
+- Top half → y should be < 50
+- Bottom half → y should be > 50
+- If the component is in bottom-right but your y < 50, YOU PLACED IT ON THE LABEL - move the box down to the actual component
+
+COORDINATE SYSTEM:
+- Origin: top-left corner (0, 0)
+- x increases going RIGHT (0 to 100)
+- y increases going DOWN (0 to 100)
+- All values are percentages of full image dimensions
+
+SIZE GUIDELINES:
+- Small valves/sensors: 2-5% width/height
+- Medium FCU/pumps: 5-10% width/height  
+- Large AHU/equipment: 10-12% width/height
+- If you get width or height > 15%, you probably measured wrong - remeasure
+
+CATEGORIES:
 - hvac: FCU, AHU, EF, SF, fans, coils, air handlers, dampers, diffusers
-- plumbing: pumps, valves, pipes, fixtures, tanks, water systems (P, PUMP, V, VALVE)
-- electrical: motors, panels, switches, sensors, controls (M, MOTOR)
-- mechanical: gears, bearings, couplings, drives
-- structural: beams, columns, supports
-- other: unclear
+- plumbing: pumps (P, PUMP), valves (V, VALVE), water heaters, tanks
+- electrical: motors (M, MOTOR), panels, switches, controls
+- mechanical: gears, bearings, couplings
+- structural: beams, columns
+- other: unclear category
 
-CONFIDENCE (50–100%)
-- 90–100: Clear label+arrow, outline obvious, coordinates verified to cover component.
-- 75–89: Good label+arrow, minor uncertainty in box size/placement.
-- 50–74: Detected but coordinates somewhat estimated—lower confidence accordingly.
+CONFIDENCE SCORING:
+- 95-100: Crystal clear label, obvious symbol, traced correctly
+- 85-94: Clear label and symbol, minor placement uncertainty
+- 70-84: Found label and symbol but coordinates are estimated
+- 50-69: Uncertain detection or location
 
-COORDINATE CORRECTION EXAMPLES
-- Label top-left, component mid-right: coords should be around x ~70, y ~45, not near the label. Adjust if your first guess is near the label.
-- Component near bottom edge: y must be > 70; if you got y ~20, you placed it on the label—move down.
-- Box too big: if width or height > 20%, shrink to fit the component outline.
+CRITICAL REMINDERS:
+1. ⚠️ SCAN THE ENTIRE IMAGE SYSTEMATICALLY - divide into sections and check each one
+2. ⚠️ COUNT all labeled components you can see - if you count 8 labels, you should return 8 symbols
+3. The box goes on the SYMBOL, not the label text
+4. Double-check your y-coordinates - if component is in lower half, y must be > 50
+5. If the arrow clearly points to a component but the label is unreadable, include it with name "?" and describe what the component appears to be
+6. Prefer dark/clear outlines; skip faint/light-gray background shapes
+7. ⚠️ Before finishing, do a final pass to ensure you haven't missed any labeled components
 
-REQUIRED FIELDS PER SYMBOL
-name (exact label text), description, confidence, category, coordinates {x,y,width,height} in %.
-
-STRICT JSON ONLY
+OUTPUT (JSON ONLY, NO MARKDOWN):
 {
-  "symbols": [ { "name": "FCU-1", "description": "...", "confidence": 90, "category": "hvac", "coordinates": {"x": 25.0, "y": 18.0, "width": 7.0, "height": 6.0} } ],
-  "summary": "Found X components with verified coordinates",
-  "overallConfidence": 88
-}
-
-Return ONLY JSON. No markdown.`;
+  "symbols": [
+    {
+      "name": "FCU-1",
+      "description": "Fan coil unit in upper right bedroom",
+      "confidence": 92,
+      "category": "hvac",
+      "coordinates": {"x": 78.0, "y": 28.0, "width": 6.0, "height": 5.0}
+    },
+    {
+      "name": "SF-2",
+      "description": "Supply fan in left corridor",
+      "confidence": 88,
+      "category": "hvac",
+      "coordinates": {"x": 22.0, "y": 45.0, "width": 7.0, "height": 6.0}
+    },
+    {
+      "name": "EF-1",
+      "description": "Exhaust fan in bathroom",
+      "confidence": 85,
+      "category": "hvac",
+      "coordinates": {"x": 55.0, "y": 72.0, "width": 5.0, "height": 5.0}
+    },
+    {
+      "name": "?",
+      "description": "Arrow to pump-like symbol; label is illegible",
+      "confidence": 78,
+      "category": "mechanical",
+      "coordinates": {"x": 46.0, "y": 62.0, "width": 7.0, "height": 6.0}
+    }
+  ],
+  "summary": "Found 4 mechanical components across the entire blueprint after systematic scan",
+  "overallConfidence": 85
+}`;
 
 
     console.log('🤖 Using label-focused prompt for symbol detection...');
@@ -209,7 +341,7 @@ Return ONLY JSON. No markdown.`;
           ]
         }
       ],
-      max_tokens: 2500, // Increased from 1500 to handle more symbols
+      max_tokens: 4000, // Increased to handle blueprints with many symbols
       temperature: 0.1 // Lower temperature for more consistent analysis
     }, {
       timeout: 30000 // 30 second timeout
@@ -254,7 +386,7 @@ Return ONLY JSON. No markdown.`;
 
       analysisData = JSON.parse(jsonString);
       console.log('🤖 Successfully parsed JSON:', analysisData);
-      
+
       // Log detailed symbol data for debugging
       if (analysisData.symbols && analysisData.symbols.length > 0) {
         console.log(`🔍 AI returned ${analysisData.symbols.length} symbols:`);
@@ -264,7 +396,7 @@ Return ONLY JSON. No markdown.`;
       } else {
         console.log('⚠️ No symbols returned by AI or symbols array is empty');
       }
-      
+
       // Check if response was truncated
       if (aiResponse.length > 14000) { // Close to token limit
         console.log('⚠️ AI response might be truncated due to token limit. Consider increasing max_tokens.');
@@ -286,39 +418,43 @@ Return ONLY JSON. No markdown.`;
 
     // Structure the final result - map AI response to DetectedSymbol interface
     const symbolsArray = await Promise.all((analysisData.symbols || []).map(async (symbol: any) => {
-        // Handle confidence conversion more carefully
-        let confidence = symbol.confidence || 0;
-        
-        // Log raw confidence for debugging
-        console.log(`🔍 Symbol "${symbol.name}" raw confidence:`, confidence);
-        
-        // If confidence is already a decimal (0-1), keep it; if percentage (1-100), convert it
-        if (confidence > 1) {
-          confidence = confidence / 100; // Convert percentage to decimal
-          console.log(`🔍 Converted confidence from percentage: ${symbol.confidence}% → ${confidence}`);
-        } else if (confidence < 0.1 && confidence > 0) {
-          // If confidence is suspiciously low (like 0.01), it might be double-converted
-          confidence = Math.min(confidence * 100, 1.0); // Convert back, but cap at 1.0
-          console.log(`🔍 Corrected suspiciously low confidence: ${symbol.confidence} → ${confidence}`);
-        }
-        
-        // Ensure minimum confidence for detected symbols (lowered for better detection)
-        if (confidence < 0.4 && confidence > 0) {
-          console.log(`⚠️ Low confidence detected (${confidence}), setting minimum to 0.5 for challenging cases`);
-          confidence = 0.5; // Set lower minimum to catch more symbols
-        }
-        
-        const clamped = clampBox(symbol.coordinates);
-        const recentered = await recenterBox(clamped, meta);
+      // Handle confidence conversion more carefully
+      let confidence = symbol.confidence || 0;
 
-        return {
-          name: symbol.name || 'Unknown Component',
-          description: symbol.description || '',
-          confidence: confidence,
-          category: mapCategoryToExpectedFormat(symbol.category) as any,
-          coordinates: recentered
-        };
-      }));
+      // Log raw confidence for debugging
+      console.log(`🔍 Symbol "${symbol.name}" raw confidence:`, confidence);
+
+      // If confidence is already a decimal (0-1), keep it; if percentage (1-100), convert it
+      if (confidence > 1) {
+        confidence = confidence / 100; // Convert percentage to decimal
+        console.log(`🔍 Converted confidence from percentage: ${symbol.confidence}% → ${confidence}`);
+      } else if (confidence < 0.1 && confidence > 0) {
+        // If confidence is suspiciously low (like 0.01), it might be double-converted
+        confidence = Math.min(confidence * 100, 1.0); // Convert back, but cap at 1.0
+        console.log(`🔍 Corrected suspiciously low confidence: ${symbol.confidence} → ${confidence}`);
+      }
+
+      // Ensure minimum confidence for detected symbols (lowered for better detection)
+      if (confidence < 0.4 && confidence > 0) {
+        console.log(`⚠️ Low confidence detected (${confidence}), setting minimum to 0.5 for challenging cases`);
+        confidence = 0.5; // Set lower minimum to catch more symbols
+      }
+
+      const clamped = clampBox(symbol.coordinates);
+      const recentered = await recenterBox(clamped, meta);
+
+      const rawName = typeof symbol.name === 'string' ? symbol.name.trim() : '';
+      const name = rawName || '?';
+      const description = symbol.description || (name === '?' ? 'Arrow-targeted component with unreadable label' : '');
+
+      return {
+        name,
+        description,
+        confidence: confidence,
+        category: mapCategoryToExpectedFormat(symbol.category) as any,
+        coordinates: recentered
+      };
+    }));
 
     // Filter out obviously bad boxes after clamping
     const symbols = symbolsArray.filter((s: any) => Number.isFinite(s.coordinates.x) && Number.isFinite(s.coordinates.y));

@@ -6,18 +6,62 @@ import { SymbolAnalysis } from '@/components/Blueprint/SymbolAnalysis';
 import { SaveToProjectModal } from '@/components/Project/SaveToProjectModal';
 import { useApp } from '@/context/AppContext';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getBlueprintById } from '@/services/blueprintService';
 
 export function BlueprintDetail() {
   const { blueprintId, projectId } = useParams<{ blueprintId: string; projectId?: string }>();
   const navigate = useNavigate();
   const { state, dispatch } = useApp();
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch latest blueprint data from server on mount
+  useEffect(() => {
+    const fetchBlueprint = async () => {
+      if (!blueprintId) return;
+      
+      console.log('📋 Fetching latest blueprint data from server:', blueprintId);
+      setIsLoading(true);
+      
+      try {
+        const response = await getBlueprintById(blueprintId);
+        if (response.success && response.data) {
+          console.log('✅ Fetched blueprint with', response.data.symbols?.length || 0, 'symbols');
+          // Update the blueprint in context with fresh data from server
+          dispatch({ type: 'UPDATE_BLUEPRINT', payload: response.data });
+        } else {
+          console.error('❌ Failed to fetch blueprint:', response.message);
+        }
+      } catch (error) {
+        console.error('❌ Error fetching blueprint:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchBlueprint();
+  }, [blueprintId, dispatch]);
 
   const blueprint = state.blueprints.find(b => b.id === blueprintId);
   const project = blueprint?.projectId 
     ? state.projects.find(p => p.id === blueprint.projectId)
     : null;
+
+  // Show loading state while fetching
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Sidebar />
+        <main className="ml-64 p-6 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading blueprint...</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   if (!blueprint) {
     return (
@@ -29,7 +73,7 @@ export function BlueprintDetail() {
                 Blueprint Not Found
               </h2>
               <p className="text-muted-foreground mb-4">
-                The blueprint you're looking for doesn't exist.
+                {isLoading ? 'Loading...' : "The blueprint you're looking for doesn't exist."}
               </p>
               <Button 
                 onClick={() => navigate(projectId ? `/projects/${projectId}` : '/history/blueprints')} 
@@ -45,6 +89,21 @@ export function BlueprintDetail() {
 
   const handleSaveToProject = () => {
     setShowSaveModal(true);
+  };
+
+  const handleSymbolsChange = (symbols: any[]) => {
+    console.log('📋 [BLUEPRINT_DETAIL] Symbols changed, updating context with', symbols.length, 'symbols');
+    if (blueprint) {
+      const updatedBlueprint = {
+        ...blueprint,
+        symbols: symbols,
+        totalSymbols: symbols.length,
+        averageAccuracy: symbols.length > 0 
+          ? symbols.reduce((sum, s) => sum + s.confidence, 0) / symbols.length
+          : 0
+      };
+      dispatch({ type: 'UPDATE_BLUEPRINT', payload: updatedBlueprint });
+    }
   };
 
   return (
@@ -106,7 +165,10 @@ export function BlueprintDetail() {
               <h2 className="text-xl font-semibold text-foreground mb-4">
                 Blueprint Analysis
               </h2>
-              <BlueprintViewer blueprint={blueprint} />
+              <BlueprintViewer 
+                blueprint={blueprint}
+                onSymbolsChange={handleSymbolsChange}
+              />
             </div>
 
             {/* Symbol Analysis */}

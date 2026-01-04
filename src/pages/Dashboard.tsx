@@ -110,6 +110,20 @@ export function Dashboard() {
     // Draft is already stored in context by UploadArea
   };
 
+  const handleSymbolsChange = (symbols: any[]) => {
+    console.log('📋 [DASHBOARD] Symbols changed, updating blueprint with', symbols.length, 'symbols');
+    if (uploadedBlueprint) {
+      setUploadedBlueprint({
+        ...uploadedBlueprint,
+        symbols: symbols,
+        totalSymbols: symbols.length,
+        averageAccuracy: symbols.length > 0 
+          ? symbols.reduce((sum, s) => sum + s.confidence, 0) / symbols.length
+          : 0
+      });
+    }
+  };
+
   const handleSaveToProject = () => {
     console.log('📋 [DASHBOARD] Opening SaveToProjectModal with blueprint:', uploadedBlueprint);
     console.log('📋 [DASHBOARD] Blueprint ID being passed:', uploadedBlueprint?.id);
@@ -242,7 +256,10 @@ export function Dashboard() {
                   </div>
                 </div>
                 
-                <BlueprintViewer blueprint={uploadedBlueprint} />
+                <BlueprintViewer 
+                  blueprint={uploadedBlueprint}
+                  onSymbolsChange={handleSymbolsChange}
+                />
               </div>
 
               {/* Symbol Analysis */}

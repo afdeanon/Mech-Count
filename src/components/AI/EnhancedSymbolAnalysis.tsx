@@ -12,7 +12,8 @@ import {
   Cog,
   Wrench,
   Gauge,
-  Power
+  Power,
+  Plus
 } from 'lucide-react';
 import { Blueprint, MechanicalSymbol } from '@/types';
 
@@ -57,6 +58,10 @@ export function EnhancedSymbolAnalysis({ blueprint }: EnhancedSymbolAnalysisProp
     symbols: symbols?.map(s => ({ name: s.name, confidence: s.confidence })) || [],
     aiAnalysis
   });
+  
+  // Separate manually added from AI-detected
+  const manuallyAdded = symbols.filter(s => s.id.startsWith('manual-'));
+  const aiDetected = symbols.filter(s => !s.id.startsWith('manual-'));
   
   // Group symbols by category
   const symbolsByCategory = symbols.reduce((acc, symbol) => {
@@ -167,6 +172,34 @@ export function EnhancedSymbolAnalysis({ blueprint }: EnhancedSymbolAnalysisProp
         </CardContent>
       </Card>
 
+      {/* Manually Added Symbols Section */}
+      {manuallyAdded.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Plus className="w-5 h-5 text-purple-600" />
+              Added Symbols
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {manuallyAdded.map((symbol) => (
+                <div key={symbol.id} className="bg-purple-50 p-3 rounded-lg border border-purple-200">
+                  <div className="flex items-start justify-between mb-2">
+                    <h4 className="font-medium text-sm text-purple-900">{symbol.name}</h4>
+                    <Badge className="bg-purple-600 text-xs">100%</Badge>
+                  </div>
+                  {symbol.description && (
+                    <p className="text-xs text-purple-700">{symbol.description}</p>
+                  )}
+                  <div className="text-xs text-purple-600 mt-2 capitalize">{symbol.category}</div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Symbols by Category */}
       <Card>
         <CardHeader>
@@ -221,6 +254,32 @@ export function EnhancedSymbolAnalysis({ blueprint }: EnhancedSymbolAnalysisProp
               <p className="text-muted-foreground">No symbols detected in this blueprint</p>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Total Symbol Summary */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Total Symbols Summary</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="text-center p-4 bg-blue-50 rounded-lg">
+              <div className="text-3xl font-bold text-blue-600">{symbols.length}</div>
+              <div className="text-sm text-blue-700 mt-1">Total Symbols</div>
+              <div className="text-xs text-blue-600 mt-2">{aiDetected.length} detected + {manuallyAdded.length} added</div>
+            </div>
+            <div className="text-center p-4 bg-green-50 rounded-lg">
+              <div className="text-3xl font-bold text-green-600">{aiDetected.length}</div>
+              <div className="text-sm text-green-700 mt-1">AI-Detected</div>
+              <div className="text-xs text-green-600 mt-2">{Math.round((aiDetected.length / Math.max(1, symbols.length)) * 100)}% of total</div>
+            </div>
+            <div className="text-center p-4 bg-purple-50 rounded-lg">
+              <div className="text-3xl font-bold text-purple-600">{manuallyAdded.length}</div>
+              <div className="text-sm text-purple-700 mt-1">Manually Added</div>
+              <div className="text-xs text-purple-600 mt-2">{Math.round((manuallyAdded.length / Math.max(1, symbols.length)) * 100)}% of total</div>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>
