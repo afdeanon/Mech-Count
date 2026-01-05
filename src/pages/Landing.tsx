@@ -45,7 +45,7 @@ export function Landing() {
       />
 
       {/* Hero Section */}
-      <main className="container mx-auto px-4 py-16">
+      <main className="container mx-auto px-4 py-32">
         <div className="text-center max-w-4xl mx-auto">
           <div className="animate-fade-in">
             <h1 className="text-5xl md:text-6xl font-bold text-foreground mb-6">

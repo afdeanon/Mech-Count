@@ -4,7 +4,6 @@ import { UploadArea } from '@/components/Upload/UploadArea';
 import { BlueprintViewer } from '@/components/Blueprint/BlueprintViewer';
 import { SymbolAnalysis } from '@/components/Blueprint/SymbolAnalysis';
 import {SaveToProjectModal } from '@/components/Project/SaveToProjectModal';
-import { AITestPanel } from '@/components/AI/AITestPanel';
 import { Button } from '@/components/ui/button';
 import { Blueprint } from '@/types';
 import { deleteBlueprint, getBlueprintById } from '@/services/blueprintService';
@@ -271,10 +270,6 @@ export function Dashboard() {
             </div>
           )}
 
-          {/* AI Service Testing Panel */}
-          <div className="mt-8">
-            <AITestPanel />
-          </div>
         </div>
       </main>
 

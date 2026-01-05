@@ -1,3 +1,5 @@
+import { File } from 'multer';
+
 declare global {
   namespace Express {
     interface Request {
@@ -7,6 +9,7 @@ declare global {
         name: string | undefined;
         firebaseUid: string;
       };
+      file?: File;
     }
   }
 }

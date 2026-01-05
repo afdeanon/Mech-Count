@@ -15,18 +15,6 @@ async function testAIAnalysis() {
       return;
     }
 
-    // Test 2: Test comprehensive AI capabilities
-    console.log('\n🔬 Step 2: Testing AI capabilities...');
-    const testResponse = await fetch('http://localhost:3000/api/blueprints/ai/test');
-    const testData = await testResponse.json();
-    console.log('AI capabilities test:', testData);
-
-    console.log('\n✅ AI service is working and ready for blueprint analysis!');
-    console.log('\n📝 Next steps:');
-    console.log('1. Upload a real blueprint image through the frontend');
-    console.log('2. The AI analysis should now work correctly');
-    console.log('3. Check for symbols in the analysis results');
-
   } catch (error) {
     console.error('❌ Test failed:', error.message);
   }

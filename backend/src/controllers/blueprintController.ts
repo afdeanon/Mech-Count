@@ -142,7 +142,7 @@ export async function uploadBlueprint(req: Request, res: Response) {
         const project = await Project.findOne({ _id: projectId, userId: userObjectId });
         if (project) {
           const blueprintObjectId = blueprint._id as mongoose.Types.ObjectId;
-          if (!project.blueprintIds.some(id => id.equals(blueprintObjectId))) {
+          if (!project.blueprintIds.some(id => id.toString() === blueprintObjectId.toString())) {
             project.blueprintIds.push(blueprintObjectId);
             await project.save();
             console.log(`📎 [DEBUG] Added blueprint ${blueprint._id} to project ${projectId}`);
