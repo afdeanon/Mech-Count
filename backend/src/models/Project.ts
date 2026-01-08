@@ -19,7 +19,7 @@ const ProjectSchema = new Schema<IProject>({
   },
   description: {
     type: String,
-    required: true,
+    required: false,
     trim: true
   },
   userId: {

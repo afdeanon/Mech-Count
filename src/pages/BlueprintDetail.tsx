@@ -172,11 +172,7 @@ export function BlueprintDetail() {
             </div>
 
             {/* Symbol Analysis */}
-            <SymbolAnalysis 
-              blueprint={blueprint}
-              onSaveToProject={handleSaveToProject}
-              showSaveButton={!blueprint.projectId}
-            />
+
           </div>
         </main>
 

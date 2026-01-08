@@ -8,7 +8,7 @@ import Joi from 'joi';
 // Validation schemas
 const createProjectSchema = Joi.object({
   name: Joi.string().required().min(1).max(100),
-  description: Joi.string().required().min(1).max(500)
+  description: Joi.string().optional().min(1).max(500)
 });
 
 const updateProjectSchema = Joi.object({

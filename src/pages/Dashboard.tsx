@@ -262,11 +262,7 @@ export function Dashboard() {
               </div>
 
               {/* Symbol Analysis */}
-              <SymbolAnalysis 
-                blueprint={uploadedBlueprint}
-                onSaveToProject={handleSaveToProject}
-                showSaveButton={false}
-              />
+              
             </div>
           )}
 
