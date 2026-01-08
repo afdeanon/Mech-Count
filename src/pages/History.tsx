@@ -94,6 +94,23 @@ export function History() {
     return project?.name;
   };
 
+  const getAccuracyPercentage = (blueprint: typeof sortedBlueprints[0]) => {
+    // If averageAccuracy is already a percentage (> 1), use it
+    if (blueprint.averageAccuracy > 1) {
+      return Math.round(blueprint.averageAccuracy);
+    }
+    // If averageAccuracy is a decimal (0-1), convert to percentage
+    if (blueprint.averageAccuracy > 0) {
+      return Math.round(blueprint.averageAccuracy * 100);
+    }
+    // Calculate from symbols if averageAccuracy is 0 or missing
+    if (blueprint.symbols && blueprint.symbols.length > 0) {
+      const avgConfidence = blueprint.symbols.reduce((sum, s) => sum + s.confidence, 0) / blueprint.symbols.length;
+      return Math.round(avgConfidence * 100);
+    }
+    return 0;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
@@ -160,7 +177,7 @@ export function History() {
                       {/* Accuracy badge positioned to left of three-dot menu */}
                       <div className="absolute top-4 left-4">
                         <Badge variant="secondary" className="text-xs bg-white/90 text-gray-800">
-                          {Math.round(blueprint.averageAccuracy)}% accuracy
+                          {getAccuracyPercentage(blueprint)}% accuracy
                         </Badge>
                       </div>
 
@@ -267,7 +284,7 @@ export function History() {
                       {/* Accuracy badge, project badge, and Three-dot menu */}
                       <div className="absolute top-4 right-4 flex items-center gap-2">
                         <Badge variant="secondary" className="text-xs bg-white/90 text-gray-800">
-                          {Math.round(blueprint.averageAccuracy)}% accuracy
+                          {getAccuracyPercentage(blueprint)}% accuracy
                         </Badge>
                         {blueprint.projectId && (
                           <Badge variant="outline" className="text-xs bg-white/90 text-gray-800">
