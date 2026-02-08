@@ -1,3 +1,24 @@
+// Add a manual symbol to a blueprint
+export async function addManualSymbolToBlueprint(blueprintId: string, symbol: {
+  name: string;
+  category: string;
+  description?: string;
+  position?: any;
+}): Promise<ApiResponse<any>> {
+  try {
+    const response = await authenticatedFetch(`/blueprints/${blueprintId}/symbols`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(symbol)
+    });
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    return { success: false, message: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
 import { auth } from '@/config/firebase';
 import type { Blueprint } from '@/types';
 

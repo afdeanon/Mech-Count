@@ -106,6 +106,7 @@ export async function uploadBlueprint(req: Request, res: Response) {
       req.file.mimetype,
       'blueprints'
     );
+    
 
     // Create blueprint document
     const blueprint = new Blueprint({

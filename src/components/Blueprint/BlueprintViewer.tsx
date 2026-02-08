@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, Move, Brain, Clock, CheckCircle, XCircle, AlertCircle, Eye, EyeOff, Plus, Trash2, Pencil } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Move, Brain, Clock, CheckCircle, XCircle, AlertCircle, Eye, EyeOff, Plus, Trash2, Pencil, MehIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Blueprint } from '@/types';
@@ -260,11 +260,11 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
 
   const getSymbolColor = (category: string) => {
     const colors = {
-      hydraulic: '#3b82f6',
-      pneumatic: '#10b981',
-      mechanical: '#f59e0b',
-      electrical: '#ef4444',
-      other: '#6b7280'
+      hydraulic: '#3b82f6',    // blue-500
+  pneumatic: '#22c55e',    // green-500
+  mechanical: '#f97316',   // orange-500
+  electrical: '#eab308',   // yellow-500
+  other: '#6b7280'         // gray-500
     };
     return colors[category as keyof typeof colors] || '#6b7280';
   };

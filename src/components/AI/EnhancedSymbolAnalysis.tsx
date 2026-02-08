@@ -16,6 +16,7 @@ import {
   Plus
 } from 'lucide-react';
 import { Blueprint, MechanicalSymbol } from '@/types';
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, CartesianGrid, XAxis, YAxis, Bar } from 'recharts';
 
 interface EnhancedSymbolAnalysisProps {
   blueprint: Blueprint;
@@ -37,6 +38,14 @@ const categoryColors = {
   other: 'bg-gray-500'
 };
 
+const categoryColorsGraphs = {
+  hydraulic: '#3b82f6',    // blue-500
+  pneumatic: '#22c55e',    // green-500
+  mechanical: '#f97316',   // orange-500
+  electrical: '#eab308',   // yellow-500
+  other: '#6b7280'         // gray-500
+};
+
 const getConfidenceColor = (confidence: number) => {
   if (confidence >= 90) return 'text-green-600';
   if (confidence >= 75) return 'text-blue-600';
@@ -51,6 +60,8 @@ const getConfidenceBadgeVariant = (confidence: number) => {
 };
 
 export function EnhancedSymbolAnalysis({ blueprint }: EnhancedSymbolAnalysisProps) {
+    // Capitalize first letter utility
+    const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
   const { symbols, aiAnalysis } = blueprint;
   
   console.log('🔍 EnhancedSymbolAnalysis received:', {
@@ -105,7 +116,6 @@ export function EnhancedSymbolAnalysis({ blueprint }: EnhancedSymbolAnalysisProp
                   </div>
                 </div>
               </div>
-              
               {aiAnalysis.processingTime && (
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -119,86 +129,167 @@ export function EnhancedSymbolAnalysis({ blueprint }: EnhancedSymbolAnalysisProp
                   </div>
                 </div>
               )}
-              
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
                   <Target className="w-5 h-5 text-purple-600" />
                 </div>
                 <div>
-                  <div className="font-semibold text-purple-900">{symbols.length}</div>
+                  <div className="font-semibold text-purple-900">{aiDetected.length}</div>
                   <div className="text-sm text-purple-700">Symbols detected</div>
                 </div>
               </div>
             </div>
-            
+            {/* Detection Confidence Distribution */}
+            <div className="space-y-3 mt-4">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-medium">Detection Confidence</span>
+                <span className="font-medium text-muted-foreground">{avgConfidence}% average</span>
+              </div>
+              <Progress value={avgConfidence} className="h-2" />
+              <div className="grid grid-cols-3 gap-4 mt-3">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">{highConfidenceCount}</div>
+                  <div className="text-xs text-muted-foreground">High (90%+)</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">{mediumConfidenceCount}</div>
+                  <div className="text-xs text-muted-foreground">Medium (75-89%)</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-yellow-600">{lowConfidenceCount}</div>
+                  <div className="text-xs text-muted-foreground">Low (&lt;75%)</div>
+                </div>
+              </div>
+            </div>
             {aiAnalysis.summary && (
               <div className="bg-muted/30 p-4 rounded-lg">
                 <h4 className="font-medium mb-2">Analysis Summary</h4>
                 <p className="text-sm text-muted-foreground">{aiAnalysis.summary}</p>
               </div>
             )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Confidence Distribution */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Detection Confidence</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between text-sm">
-              <span>Average Confidence</span>
-              <span className="font-medium">{avgConfidence}%</span>
-            </div>
-            <Progress value={avgConfidence} className="h-2" />
-            
-            <div className="grid grid-cols-3 gap-4 mt-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold text-green-600">{highConfidenceCount}</div>
-                <div className="text-xs text-muted-foreground">High (90%+)</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-blue-600">{mediumConfidenceCount}</div>
-                <div className="text-xs text-muted-foreground">Medium (75-89%)</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold text-yellow-600">{lowConfidenceCount}</div>
-                <div className="text-xs text-muted-foreground">Low (&lt;75%)</div>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Manually Added Symbols Section */}
-      {manuallyAdded.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Plus className="w-5 h-5 text-purple-600" />
-              Added Symbols
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-              {manuallyAdded.map((symbol) => (
-                <div key={symbol.id} className="bg-purple-50 p-3 rounded-lg border border-purple-200">
-                  <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-medium text-sm text-purple-900">{symbol.name}</h4>
-                    <Badge className="bg-purple-600 text-xs">100%</Badge>
+            {/* Visualization Section (now inside AI Analysis Summary) */}
+            <div className="p-4 bg-muted/30 rounded-lg">
+              <h3 className="text-lg font-semibold mb-4">Visualization</h3>
+              <div className="flex flex-col md:flex-row gap-8 items-stretch w-full">
+                {/* Donut Chart: Category Distribution */}
+                <div className="flex-1 min-w-0 flex flex-col items-center justify-center">
+                  <h4 className="text-sm font-medium mb-2">Category Distribution</h4>
+                  <ResponsiveContainer width="100%" height={320}>
+                    <PieChart>
+                      <Pie
+                        data={Object.entries(symbolsByCategory).map(([category, symbols]) => ({
+                          name: category,
+                          value: symbols.length,
+                          fill: categoryColorsGraphs[category as keyof typeof categoryColorsGraphs] || '#6b7280'
+                        }))}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={3}
+                        dataKey="value"
+                        label={({ name, percent }) => `${capitalize(name)}: ${(percent * 100).toFixed(0)}%`}
+                        labelLine={false}
+                      >
+                        {Object.entries(symbolsByCategory).map(([category], index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={categoryColorsGraphs[category as keyof typeof categoryColorsGraphs] || '#6b7280'}
+                          />
+                        ))}
+                      </Pie>
+                      <Tooltip
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            return (
+                              <div className="bg-background border rounded-lg p-2 shadow-lg">
+                                <p className="font-medium capitalize">{payload[0].name}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {payload[0].value} symbols ({((payload[0].value as number / symbols.length) * 100).toFixed(1)}%)
+                                </p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  {/* Legend below donut */}
+                  <div className="flex flex-wrap justify-center gap-3 mt-4">
+                    {Object.entries(symbolsByCategory).map(([category]) => (
+                      <div key={category} className="flex items-center gap-2">
+                        <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: categoryColorsGraphs[category as keyof typeof categoryColorsGraphs] || '#6b7280' }}></span>
+                        <span className="capitalize text-xs text-muted-foreground">{category}</span>
+                      </div>
+                    ))}
                   </div>
-                  {symbol.description && (
-                    <p className="text-xs text-purple-700">{symbol.description}</p>
-                  )}
-                  <div className="text-xs text-purple-600 mt-2 capitalize">{symbol.category}</div>
                 </div>
-              ))}
+                {/* Bar Graph: Mechanical Symbol Counts (color by category) */}
+                <div className="flex-1 min-w-0 flex flex-col items-center justify-center">
+                  <h4 className="text-sm font-medium mb-2">Mechanical Symbol Counts</h4>
+                  <ResponsiveContainer width="100%" height={260}>
+                    <BarChart
+                      data={(() => {
+                        const nameCounts: Record<string, { name: string; count: number; category: string }> = {};
+                        symbols.forEach(symbol => {
+                          if (!nameCounts[symbol.name]) {
+                            nameCounts[symbol.name] = { name: symbol.name, count: 0, category: symbol.category };
+                          }
+                          nameCounts[symbol.name].count += 1;
+                        });
+                        return Object.values(nameCounts)
+                          .sort((a, b) => b.count - a.count);
+                      })()}
+                      layout="vertical"
+                      margin={{ top: 20, right: 30, left: 40, bottom: 20 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" allowDecimals={false} />
+                      <YAxis dataKey="name" type="category" width={100} tickFormatter={capitalize} />
+                      <Tooltip
+                        content={({ active, payload, label }) => {
+                          if (active && payload && payload.length) {
+                            const category = payload[0].payload.category;
+                            return (
+                              <div className="bg-background border rounded-lg p-3 shadow-lg">
+                                <p className="font-medium mb-2">{label}</p>
+                                <div className="flex items-center gap-2 text-sm">
+                                  <span className="capitalize">Count:</span>
+                                  <span className="font-medium">{payload[0].value}</span>
+                                  <span className="capitalize ml-2" style={{ color: categoryColorsGraphs[category] || '#6b7280' }}>{category}</span>
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Bar dataKey="count">
+                        {(() => {
+                          const nameCounts: Record<string, { name: string; count: number; category: string }> = {};
+                          symbols.forEach(symbol => {
+                            if (!nameCounts[symbol.name]) {
+                              nameCounts[symbol.name] = { name: symbol.name, count: 0, category: symbol.category };
+                            }
+                            nameCounts[symbol.name].count += 1;
+                          });
+                          return Object.values(nameCounts)
+                            .sort((a, b) => b.count - a.count)
+                            .map((item, idx) => (
+                              <Cell key={`bar-cell-${item.name}`} fill={categoryColorsGraphs[item.category as keyof typeof categoryColorsGraphs] || '#6b7280'} />
+                            ));
+                        })()}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
       )}
+                  
 
       {/* Symbols by Category */}
       <Card>
