@@ -2,8 +2,8 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Sidebar } from '@/components/Layout/Sidebar';
 import { Button } from '@/components/ui/button';
 import { BlueprintViewer } from '@/components/Blueprint/BlueprintViewer';
-import { SymbolAnalysis } from '@/components/Blueprint/SymbolAnalysis';
 import { SaveToProjectModal } from '@/components/Project/SaveToProjectModal';
+import { EnhancedSymbolAnalysis } from '@/components/AI/EnhancedSymbolAnalysis';
 import { useApp } from '@/context/AppContext';
 import { ArrowLeft, ChevronRight } from 'lucide-react';
 import { useState, useEffect } from 'react';
@@ -112,68 +112,53 @@ export function BlueprintDetail() {
       <main className="ml-64 p-6">
           <div className="max-w-6xl mx-auto space-y-6">
             {/* Navigation */}
-            <div className="flex items-center gap-4">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => navigate(-1)}
-                className="gap-2"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                Back
-              </Button>
-
-              {/* Breadcrumb */}
-              {project && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Link 
-                    to={`/projects/${project.id}`}
-                    className="hover:text-foreground transition-colors"
-                  >
-                    {project.name}
-                  </Link>
-                  <ChevronRight className="w-4 h-4" />
-                  <span>{blueprint.name}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Blueprint Header */}
-            <div className="glass-card p-6">
-              <div className="flex items-start justify-between">
-                <div>
-                  <h1 className="text-2xl font-bold text-foreground mb-2">
-                    {blueprint.name}
-                  </h1>
-                  {blueprint.description && (
-                    <p className="text-muted-foreground">
-                      {blueprint.description}
-                    </p>
-                  )}
-                </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => navigate(-1)}
+                  className="gap-2"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  Back
+                </Button>
                 
-                <div className="text-right text-sm text-muted-foreground">
-                  <div>Uploaded {new Date(blueprint.uploadDate).toLocaleDateString()}</div>
-                  <div>{blueprint.symbols.length} symbols detected</div>
-                  <div>{Math.round(blueprint.averageAccuracy)}% average accuracy</div>
-                </div>
+                {/* Project/Blueprint Path */}
+                {/* <h1 className="text-xl font-semibold text-foreground">
+                  {project ? (
+                    <>
+                      <Link 
+                        to={`/projects/${project.id}`}
+                        className="hover:text-blue-600 transition-colors"
+                      >
+                        {project.name}
+                      </Link>
+                      <span className="text-muted-foreground mx-2">/</span>
+                      {blueprint.name}
+                    </>
+                  ) : (
+                    blueprint.name
+                  )}
+                </h1> */}
+              </div>
+              
+              {/* Upload Date */}
+              <div className="text-sm text-muted-foreground">
+                Uploaded: {new Date(blueprint.uploadDate).toLocaleDateString()}
               </div>
             </div>
 
             {/* Blueprint Viewer */}
-            <div className="glass-card p-6">
-              <h2 className="text-xl font-semibold text-foreground mb-4">
-                Blueprint Analysis
-              </h2>
               <BlueprintViewer 
                 blueprint={blueprint}
                 onSymbolsChange={handleSymbolsChange}
               />
-            </div>
 
             {/* Symbol Analysis */}
-
+              <EnhancedSymbolAnalysis blueprint={blueprint} />
           </div>
+        
         </main>
 
       <SaveToProjectModal

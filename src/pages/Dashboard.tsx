@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { Sidebar } from '@/components/Layout/Sidebar';
 import { UploadArea } from '@/components/Upload/UploadArea';
 import { BlueprintViewer } from '@/components/Blueprint/BlueprintViewer';
-import { SymbolAnalysis } from '@/components/Blueprint/SymbolAnalysis';
-import {SaveToProjectModal } from '@/components/Project/SaveToProjectModal';
+import { EnhancedSymbolAnalysis } from '@/components/AI/EnhancedSymbolAnalysis';
+import { SaveToProjectModal } from '@/components/Project/SaveToProjectModal';
 import { Button } from '@/components/ui/button';
 import { Blueprint } from '@/types';
 import { deleteBlueprint, getBlueprintById } from '@/services/blueprintService';
@@ -29,6 +29,7 @@ export function Dashboard() {
   const [uploadedBlueprint, setUploadedBlueprint] = useState<Blueprint | null>(null);
   const [originalFile, setOriginalFile] = useState<File | null>(null);
 
+
   // Poll for blueprint updates when status is 'processing'
   useEffect(() => {
     if (!uploadedBlueprint || uploadedBlueprint.status !== 'processing') {
@@ -43,7 +44,7 @@ export function Dashboard() {
       try {
         console.log('🔄 Polling for blueprint updates...', uploadedBlueprint.id);
         const result = await getBlueprintById(uploadedBlueprint.id);
-        
+
         if (result.success && result.data) {
           const updatedBlueprint = result.data;
           console.log('📋 Received updated blueprint:', {
@@ -86,7 +87,7 @@ export function Dashboard() {
 
   const handleManualRefresh = async () => {
     if (!uploadedBlueprint?.id) return;
-    
+
     console.log('🔄 Manual refresh triggered for blueprint:', uploadedBlueprint.id);
     try {
       const result = await getBlueprintById(uploadedBlueprint.id);
@@ -116,7 +117,7 @@ export function Dashboard() {
         ...uploadedBlueprint,
         symbols: symbols,
         totalSymbols: symbols.length,
-        averageAccuracy: symbols.length > 0 
+        averageAccuracy: symbols.length > 0
           ? symbols.reduce((sum, s) => sum + s.confidence, 0) / symbols.length
           : 0
       });
@@ -139,13 +140,13 @@ export function Dashboard() {
     if (uploadedBlueprint?.imageUrl?.startsWith('blob:')) {
       URL.revokeObjectURL(uploadedBlueprint.imageUrl);
     }
-    
+
     // Clear local state to allow new upload
     setUploadedBlueprint(null);
     setOriginalFile(null);
     setIsProcessing(false);
     setShowConfirmDialog(false);
-    
+
     console.log('🆕 Ready for new upload - previous blueprint cleared');
   };
 
@@ -163,21 +164,21 @@ export function Dashboard() {
                 Upload your engineering blueprints for AI-powered symbol detection and analysis
               </p>
             </div>
-            
+
             {/* Action Buttons - Only show when blueprint is uploaded */}
             {uploadedBlueprint && (
               <div className="flex flex-col gap-3 ml-6">
-                <Button 
-                  onClick={handleSaveToProject} 
+                <Button
+                  onClick={handleSaveToProject}
                   className="btn-tech gap-2 px-4 py-2"
                   size="sm"
                 >
                   <Save className="w-4 h-4" />
                   Save Blueprint
                 </Button>
-                <Button 
-                  onClick={handleUploadNewBlueprint} 
-                  variant="outline" 
+                <Button
+                  onClick={handleUploadNewBlueprint}
+                  variant="outline"
                   className="gap-2 px-4 py-2"
                   size="sm"
                 >
@@ -189,7 +190,7 @@ export function Dashboard() {
           </div>
 
           {!uploadedBlueprint ? (
-            <UploadArea 
+            <UploadArea
               onBlueprintUploaded={handleBlueprintUploaded}
               isProcessing={isProcessing}
               setIsProcessing={setIsProcessing}
@@ -197,72 +198,15 @@ export function Dashboard() {
           ) : (
             <div className="space-y-8">
               {/* Blueprint Viewer */}
-              <div className="glass-card p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-xl font-semibold text-foreground mb-1">
-                      {uploadedBlueprint.name}
-                    </h2>
-                    <p className="text-muted-foreground">
-                      {uploadedBlueprint.status === 'processing' 
-                        ? `AI analysis in progress... ${uploadedBlueprint.symbols.length} symbols detected so far`
-                        : `Blueprint ready to save • ${uploadedBlueprint.symbols.length} symbols detected`
-                      }
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {uploadedBlueprint.status === 'processing' ? (
-                      <div className="flex items-center gap-2 text-sm text-blue-600">
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        {isPollingForUpdates ? 'Analyzing...' : 'Processing...'}
-                      </div>
-                    ) : uploadedBlueprint.status === 'completed' ? (
-                      <div className="flex items-center gap-2 text-sm text-green-600">
-                        <div className="w-2 h-2 rounded-full bg-green-600" />
-                        Analysis Complete
-                      </div>
-                    ) : uploadedBlueprint.status === 'failed' ? (
-                      <div className="flex items-center gap-2 text-sm text-red-600">
-                        <div className="w-2 h-2 rounded-full bg-red-600" />
-                        Analysis Failed
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 text-sm text-blue-600">
-                        <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-                        Ready to Save
-                      </div>
-                    )}
-                    <Button
-                      onClick={() => setShowConfirmDialog(true)}
-                      variant="outline"
-                      size="sm"
-                      className="gap-2"
-                    >
-                      <Upload className="w-4 h-4" />
-                      New Upload
-                    </Button>
-                    {uploadedBlueprint.status === 'processing' && (
-                      <Button
-                        onClick={handleManualRefresh}
-                        variant="outline"
-                        size="sm"
-                        className="gap-2"
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                        Refresh
-                      </Button>
-                    )}
-                  </div>
-                </div>
-                
-                <BlueprintViewer 
-                  blueprint={uploadedBlueprint}
-                  onSymbolsChange={handleSymbolsChange}
-                />
-              </div>
-
+              <BlueprintViewer
+                blueprint={uploadedBlueprint}
+                onSymbolsChange={handleSymbolsChange}
+              />
               {/* Symbol Analysis */}
-              
+              {uploadedBlueprint && (
+                  <EnhancedSymbolAnalysis blueprint={uploadedBlueprint} />
+              )}
+
             </div>
           )}
 
@@ -280,14 +224,14 @@ export function Dashboard() {
           // Clear local state after successful save
           setUploadedBlueprint(null);
           setOriginalFile(null);
-          
+
           // Clean up local blob URL if it exists
           if (uploadedBlueprint?.imageUrl?.startsWith('blob:')) {
             URL.revokeObjectURL(uploadedBlueprint.imageUrl);
           }
-          
+
           console.log('✅ [Dashboard] Local state cleared after save');
-          
+
           // Optional: Navigate to project detail if blueprint was assigned to a project
           if (updatedBlueprint?.projectId) {
             console.log('🔗 [Dashboard] Blueprint assigned to project:', updatedBlueprint.projectId);

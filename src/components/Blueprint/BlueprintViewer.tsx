@@ -23,7 +23,7 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0, offsetX: 0, offsetY: 0 });
   const [symbols, setSymbols] = useState(blueprint.symbols);
   const [isAddingSymbol, setIsAddingSymbol] = useState(false);
-  
+
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -66,14 +66,14 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
     if (imageRef.current && wrapperRef.current) {
       const imageRect = imageRef.current.getBoundingClientRect();
       const wrapperRect = wrapperRef.current.getBoundingClientRect();
-      
+
       setImageDimensions({
         width: imageRect.width,
         height: imageRect.height,
         offsetX: imageRect.left - wrapperRect.left,
         offsetY: imageRect.top - wrapperRect.top
       });
-      
+
       console.log('📐 Image dimensions updated:', {
         displayedWidth: imageRect.width,
         displayedHeight: imageRect.height,
@@ -246,8 +246,8 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
 
     const categoryInput = prompt('Enter category (hydraulic/hvac, pneumatic, mechanical, electrical, other):');
     setSymbols(prev => {
-      const updated = prev.map(s => s.id === symbolId ? { 
-        ...s, 
+      const updated = prev.map(s => s.id === symbolId ? {
+        ...s,
         name: newName.trim(),
         description: newPartName ? newPartName.trim() : s.description,
         category: categoryInput ? normalizeCategory(categoryInput) : s.category,
@@ -261,10 +261,10 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
   const getSymbolColor = (category: string) => {
     const colors = {
       hydraulic: '#3b82f6',    // blue-500
-  pneumatic: '#22c55e',    // green-500
-  mechanical: '#f97316',   // orange-500
-  electrical: '#eab308',   // yellow-500
-  other: '#6b7280'         // gray-500
+      pneumatic: '#22c55e',    // green-500
+      mechanical: '#f97316',   // orange-500
+      electrical: '#eab308',   // yellow-500
+      other: '#6b7280'         // gray-500
     };
     return colors[category as keyof typeof colors] || '#6b7280';
   };
@@ -289,8 +289,9 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
 
   return (
     <div className="blueprint-viewer relative">
-      {/* Controls */}
-      <div className="absolute top-4 left-4 z-10 flex gap-2">
+
+      {/* Floating Controls */}
+      <div className="absolute left-0 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-2 bg-white/80 rounded-lg shadow-lg p-2 border border-slate-200 ml-2">
         <Button
           size="sm"
           variant="secondary"
@@ -337,9 +338,10 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
         </Button>
       </div>
 
-      {/* AI Analysis Status */}
-      <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
-        <div className="glass px-3 py-1 flex items-center gap-2">
+      {/* Title (left) - AI Analysis Status (right) */}
+      <div className="flex justify-between items-center p-6 bg-white border-b border-slate-200">
+        <div className="text-xl font-semibold text-foreground truncate max-w-[40vw]" title={blueprint.name}>{blueprint.name}</div>
+        <div className="flex items-center gap-2">
           <Brain className="w-4 h-4" />
           {getStatusIcon(blueprint.status)}
           <span className="text-sm font-medium">
@@ -350,18 +352,16 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
               {blueprint.aiAnalysis.confidence}% confidence
             </Badge>
           )}
-        </div>
-        <div className="glass px-3 py-1 text-sm font-mono">
-          {Math.round(zoom * 100)}%
+          <div className="glass px-3 py-1 text-sm font-mono">
+            {Math.round(zoom * 100)}%
+          </div>
         </div>
       </div>
-
       {/* Viewer Container */}
       <div
         ref={containerRef}
-        className={`w-full h-[700px] overflow-hidden bg-slate-50 relative ${
-          isAddingSymbol ? 'cursor-crosshair' : 'cursor-move'
-        }`}
+        className={`w-full h-[700px] overflow-hidden bg-slate-50 relative ${isAddingSymbol ? 'cursor-crosshair' : 'cursor-move'
+          }`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
@@ -372,29 +372,31 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
             Click on the blueprint to place a symbol
           </div>
         )}
-        <div
-          style={{
-            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`
-          }}
-          className="relative origin-top-left transition-transform duration-100"
-        >
-          {/* Blueprint Image */}
-          <img
-            ref={imageRef}
-            src={blueprint.imageUrl}
-            alt={blueprint.name}
-            className="max-w-none select-none"
-            draggable={false}
-            onLoad={handleImageLoad}
-            onClick={handleImageClick}
-            style={{ 
-              width: '800px', 
-              height: 'auto', // Preserve aspect ratio
-              objectFit: 'contain' // Prevent stretching
+        <div className="flex justify-center items-center h-full w-full">
+          <div
+            ref={wrapperRef}
+            style={{
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`
             }}
-          />
+            className="relative origin-top-left transition-transform duration-100"
+          >
+            {/* Blueprint Image */}
+            <img
+              ref={imageRef}
+              src={blueprint.imageUrl}
+              alt={blueprint.name}
+              className="max-w-none select-none"
+              draggable={false}
+              onLoad={handleImageLoad}
+              onClick={handleImageClick}
+              style={{
+                width: '800px',
+                height: 'auto', // Preserve aspect ratio
+                objectFit: 'contain' // Prevent stretching
+              }}
+            />
 
-          {/* Symbol Overlays */}
+            {/* Symbol Overlays */}
           {showSymbols && showSymbolOverlays && symbols.map((symbol) => {
             // Convert percentage coordinates to pixels based on actual displayed image size
             const pixelPosition = convertPercentageToPixels(symbol.position);
@@ -409,7 +411,7 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
                 y: pct.y - symbol.position.y,
               });
             };
-            
+
             console.log('🎯 Rendering symbol:', {
               id: symbol.id,
               name: symbol.name,
@@ -418,13 +420,12 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
               category: symbol.category,
               confidence: symbol.confidence
             });
-            
+
             return (
               <div
                 key={symbol.id}
-                className={`absolute border-3 bg-opacity-25 rounded-md hover:bg-opacity-40 shadow-lg group ${
-                  draggingSymbolId === symbol.id ? 'cursor-grabbing scale-105' : 'cursor-grab hover:scale-102'
-                }`}
+                className={`absolute border-3 bg-opacity-25 rounded-md hover:bg-opacity-40 shadow-lg group ${draggingSymbolId === symbol.id ? 'cursor-grabbing scale-105' : 'cursor-grab hover:scale-102'
+                  }`}
                 style={{
                   left: `${pixelPosition.x}px`,
                   top: `${pixelPosition.y}px`,
@@ -437,7 +438,7 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
                   transition: draggingSymbolId === symbol.id ? 'none' : 'all 0.2s'
                 }}
                 title={`${symbol.name}${symbol.description ? ': ' + symbol.description : ''} (${Math.round(symbol.confidence * 100)}% confidence) - Drag to reposition`}
-              onMouseDown={startDragSymbol}
+                onMouseDown={startDragSymbol}
               >
                 {/* Action Buttons (show on hover) */}
                 <div className="absolute -top-3 -right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
@@ -465,30 +466,30 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
                 {/* Confidence Badge */}
                 <div
                   className="absolute -top-6 left-0 text-xs font-bold text-white px-2 py-1 rounded-t-md shadow-sm"
-                  style={{ 
+                  style={{
                     backgroundColor: getSymbolColor(symbol.category || 'other'),
                     minWidth: 'fit-content'
                   }}
                 >
                   {Math.round(symbol.confidence * 100)}%
                 </div>
-                
+
                 {/* Symbol Name Label */}
-                <div 
+                <div
                   className="absolute -bottom-6 left-0 text-xs font-medium text-gray-900 px-2 py-1 rounded-b-md shadow-sm max-w-32 truncate"
-                  style={{ 
+                  style={{
                     backgroundColor: 'rgba(255, 255, 255, 0.95)',
                     border: `1px solid ${getSymbolColor(symbol.category || 'other')}`
                   }}
                 >
                   {symbol.name}
                 </div>
-                
+
                 {/* Center crosshair for precise positioning */}
-                <div 
+                <div
                   className="absolute inset-0 flex items-center justify-center pointer-events-none"
                 >
-                  <div 
+                  <div
                     className="w-3 h-3 rounded-full border-2 border-white shadow-sm"
                     style={{ backgroundColor: getSymbolColor(symbol.category || 'other') }}
                   />
@@ -496,15 +497,9 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
               </div>
             );
           })}
+          </div>
         </div>
       </div>
-
-      {/* AI Analysis Results */}
-      {showSymbols && symbols.length > 0 && (
-        <div className="mt-6">
-          <EnhancedSymbolAnalysis blueprint={blueprintWithLocalSymbols} />
-        </div>
-      )}
     </div>
   );
 }
