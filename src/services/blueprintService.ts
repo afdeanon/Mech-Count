@@ -254,12 +254,13 @@ export async function deleteBlueprint(id: string): Promise<UploadResponse> {
   }
 }
 
-// Update blueprint name and description
+// Update blueprint name, description, and symbols
 export const updateBlueprint = async (blueprintId: string, updates: Partial<Blueprint>): Promise<ApiResponse<Blueprint>> => {
   try {
-    console.log('� [UPDATE_BLUEPRINT] Service called with:');
+    console.log('🔧 [UPDATE_BLUEPRINT] Service called with:');
     console.log('🔧 [UPDATE_BLUEPRINT] blueprintId:', blueprintId);
     console.log('🔧 [UPDATE_BLUEPRINT] updates:', updates);
+    console.log('🔧 [UPDATE_BLUEPRINT] symbols count:', updates.symbols?.length || 0);
     
     const token = await getAuthToken();
     if (!token) {

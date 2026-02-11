@@ -210,10 +210,33 @@ export function EnhancedSymbolAnalysis({ blueprint }: EnhancedSymbolAnalysisProp
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            Mechanical Symbols Overview
+            Overall Summary
           </CardTitle>
         </CardHeader>
         <CardContent>
+          <div className='mt-4'>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="border border-gray-300 text-center p-4 bg-gray-50 rounded-lg">
+                <div className="text-3xl font-bold text-gray-600">{symbols.length}</div>
+                <div className="text-sm text-gray-700 mt-1">Total Symbols</div>
+                <div className="text-xs text-gray-600 mt-2">{aiDetected.length} detected + {manuallyAdded.length} added</div>
+              </div>
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <div className="text-3xl font-bold text-blue-600">{aiDetected.length}</div>
+                <div className="text-sm text-blue-700 mt-1">AI-Detected</div>
+                <div className="text-xs text-blue-600 mt-2">{Math.round((aiDetected.length / Math.max(1, symbols.length)) * 100)}% of total</div>
+              </div>
+              <div className="text-center p-4 bg-purple-50 rounded-lg">
+                <div className="text-3xl font-bold text-purple-600">{manuallyAdded.length}</div>
+                <div className="text-sm text-purple-700 mt-1">Manually Added</div>
+                <div className="text-xs text-purple-600 mt-2">{Math.round((manuallyAdded.length / Math.max(1, symbols.length)) * 100)}% of total</div>
+              </div>
+            </div>
+          </div>
+          <div className='mt-4'>
+            <h1 className="text-lg font-semibold text-foreground mb-2">Mechanical Count Overview</h1>
+
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Category Distribution - Left Box */}
             <div className="border rounded-lg p-6 bg-muted/30 flex flex-col">
@@ -338,119 +361,85 @@ export function EnhancedSymbolAnalysis({ blueprint }: EnhancedSymbolAnalysisProp
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+          <div className='mt-6'>
+            <h1 className="text-lg font-semibold text-foreground mb-2">Component Inventory</h1>
 
-      {/* Mechanical Symbols Overview */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            Mechanical Symbols Overview
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="border border-gray-200 rounded-lg overflow-x-auto">
-            <table className="w-full table-fixed">
-              <colgroup>
-                <col className="w-[20%]" />
-                <col className="w-[45%]" />
-                <col className="w-[20%]" />
-                <col className="w-[15%]" />
-              </colgroup>
-              <thead className="bg-gray-50 sticky top-0">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Confidence</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {Object.entries(symbolsByCategory).map(([category, items]) => {
-                  const isExpanded = expandedCategories.has(category);
-                  return (
-                  <React.Fragment key={category}>
-                    {/* Category Header Row */}
-                    <tr 
-                      className="bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
-                      onClick={() => toggleCategory(category)}
-                    >
-                      <td colSpan={4} className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          {isExpanded ? (
-                            <ChevronDown className="w-5 h-5 text-gray-500" />
-                          ) : (
-                            <ChevronRight className="w-5 h-5 text-gray-500" />
-                          )}
-                          <span 
-                            className="w-3 h-3 rounded-full" 
-                            style={{ backgroundColor: categoryColorsGraphs[category as keyof typeof categoryColorsGraphs] }} 
-                          />
-                          <span className="font-semibold text-gray-900 capitalize">{category}</span>
-                          <span className="text-sm text-gray-500">({items.length} parts)</span>
-                        </div>
-                      </td>
-                    </tr>
-                    {isExpanded && items.map((item) => (
-                      <tr key={item.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-6 py-4">
-                          <span className="text-sm font-medium text-gray-900 truncate block">{item.name}</span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="text-sm text-gray-600 line-clamp-2">{item.description}</span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${getTableConfidenceColor(item.confidence)}`}>
-                            {getTableConfidenceIcon(item.confidence)}
-                            <span className="text-xs font-medium">{Math.round(item.confidence * 100)}%</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            item.id?.startsWith('manual-') 
-                              ? 'bg-purple-100 text-purple-800' 
-                              : 'bg-blue-100 text-blue-800'
-                          }`}>
-                            {item.id?.startsWith('manual-') ? 'Manual' : 'AI'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>    
-
-    
-      {/* Total Symbol Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Total Symbols Summary</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <div className="text-3xl font-bold text-blue-600">{symbols.length}</div>
-              <div className="text-sm text-blue-700 mt-1">Total Symbols</div>
-              <div className="text-xs text-blue-600 mt-2">{aiDetected.length} detected + {manuallyAdded.length} added</div>
-            </div>
-            <div className="text-center p-4 bg-green-50 rounded-lg">
-              <div className="text-3xl font-bold text-green-600">{aiDetected.length}</div>
-              <div className="text-sm text-green-700 mt-1">AI-Detected</div>
-              <div className="text-xs text-green-600 mt-2">{Math.round((aiDetected.length / Math.max(1, symbols.length)) * 100)}% of total</div>
-            </div>
-            <div className="text-center p-4 bg-purple-50 rounded-lg">
-              <div className="text-3xl font-bold text-purple-600">{manuallyAdded.length}</div>
-              <div className="text-sm text-purple-700 mt-1">Manually Added</div>
-              <div className="text-xs text-purple-600 mt-2">{Math.round((manuallyAdded.length / Math.max(1, symbols.length)) * 100)}% of total</div>
+            <div className="border border-gray-200 rounded-lg overflow-x-auto">
+              <table className="w-full table-fixed">
+                <colgroup>
+                  <col className="w-[20%]" />
+                  <col className="w-[45%]" />
+                  <col className="w-[20%]" />
+                  <col className="w-[15%]" />
+                </colgroup>
+                <thead className="bg-gray-50 sticky top-0">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Confidence</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {Object.entries(symbolsByCategory).map(([category, items]) => {
+                    const isExpanded = expandedCategories.has(category);
+                    return (
+                      <React.Fragment key={category}>
+                        {/* Category Header Row */}
+                        <tr
+                          className="bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
+                          onClick={() => toggleCategory(category)}
+                        >
+                          <td colSpan={4} className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              {isExpanded ? (
+                                <ChevronDown className="w-5 h-5 text-gray-500" />
+                              ) : (
+                                <ChevronRight className="w-5 h-5 text-gray-500" />
+                              )}
+                              <span
+                                className="w-3 h-3 rounded-full"
+                                style={{ backgroundColor: categoryColorsGraphs[category as keyof typeof categoryColorsGraphs] }}
+                              />
+                              <span className="font-semibold text-gray-900 capitalize">{category}</span>
+                              <span className="text-sm text-gray-500">({items.length} parts)</span>
+                            </div>
+                          </td>
+                        </tr>
+                        {isExpanded && items.map((item) => (
+                          <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-6 py-4">
+                              <span className="text-sm font-medium text-gray-900 truncate block">{item.name}</span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="text-sm text-gray-600 line-clamp-2">{item.description}</span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${getTableConfidenceColor(item.confidence)}`}>
+                                {getTableConfidenceIcon(item.confidence)}
+                                <span className="text-xs font-medium">{Math.round(item.confidence * 100)}%</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.id?.startsWith('manual-')
+                                  ? 'bg-purple-100 text-purple-800'
+                                  : 'bg-blue-100 text-blue-800'
+                                }`}>
+                                {item.id?.startsWith('manual-') ? 'Manual' : 'AI'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         </CardContent>
       </Card>
+
     </div>
   );
 }

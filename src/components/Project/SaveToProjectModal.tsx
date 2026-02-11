@@ -85,12 +85,17 @@ export function SaveToProjectModal({ isOpen, onClose, blueprint, originalFile, o
       
       // If blueprint has a real server ID (not temporary or draft), just update it
       if (blueprint.id && !blueprint.id.startsWith('blueprint-') && !blueprint.id.startsWith('draft-')) {
-        console.log('📝 Blueprint already exists on server, updating name/description...');
+        console.log('📝 Blueprint already exists on server, updating name/description and symbols...');
         console.log('📝 [DEBUG] Attempting to update blueprint ID:', blueprint.id);
         
         const updateResponse = await updateBlueprint(blueprint.id, {
           name: blueprintName,
-          description: blueprintDescription
+          description: blueprintDescription,
+          symbols: blueprint.symbols,
+          totalSymbols: blueprint.symbols?.length || 0,
+          averageAccuracy: blueprint.symbols?.length > 0 
+            ? blueprint.symbols.reduce((sum, s) => sum + s.confidence, 0) / blueprint.symbols.length
+            : 0
         });
         
         if (updateResponse.success && updateResponse.data) {

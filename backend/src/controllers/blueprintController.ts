@@ -376,13 +376,13 @@ export async function getBlueprintById(req: Request, res: Response) {
 }
 
 /**
- * Update blueprint name and description
+ * Update blueprint name, description, and symbols
  */
 export async function updateBlueprint(req: Request, res: Response) {
   try {
     const firebaseUid = req.user?.uid;
     const { id } = req.params; // Changed from blueprintId to id to match route
-    const { name, description } = req.body;
+    const { name, description, symbols, totalSymbols, averageAccuracy } = req.body;
 
     if (!firebaseUid) {
       return res.status(401).json({
@@ -391,21 +391,27 @@ export async function updateBlueprint(req: Request, res: Response) {
       });
     }
 
-    console.log(`📝 [DEBUG] Updating blueprint ${id} with name: "${name}"`);
+    console.log(`📝 [DEBUG] Updating blueprint ${id} with name: "${name}", symbols: ${symbols?.length || 0}`);
 
     const userObjectId = await getUserObjectId(firebaseUid, {
       email: req.user?.email,
       name: req.user?.name
     });
 
-    // Find and update the blueprint
+    // Find and update the blueprint  
+    const updateData: any = {
+      updatedAt: new Date()
+    };
+    
+    if (name !== undefined) updateData.name = name;
+    if (description !== undefined) updateData.description = description;
+    if (symbols !== undefined) updateData.symbols = symbols;
+    if (totalSymbols !== undefined) updateData.totalSymbols = totalSymbols;
+    if (averageAccuracy !== undefined) updateData.averageAccuracy = averageAccuracy;
+    
     const blueprint = await Blueprint.findOneAndUpdate(
-      { _id: id, userId: userObjectId }, // Changed from blueprintId to id
-      { 
-        name: name || undefined,
-        description: description || undefined,
-        updatedAt: new Date()
-      },
+      { _id: id, userId: userObjectId },
+      updateData,
       { new: true, runValidators: true }
     );
 

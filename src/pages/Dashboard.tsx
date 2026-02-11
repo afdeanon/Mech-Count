@@ -202,9 +202,23 @@ export function Dashboard() {
                 blueprint={uploadedBlueprint}
                 onSymbolsChange={handleSymbolsChange}
               />
-              {/* Symbol Analysis */}
+              
+              {/* AI Analysis Status / Symbol Analysis */}
               {uploadedBlueprint && (
-                  <EnhancedSymbolAnalysis blueprint={uploadedBlueprint} />
+                <>  
+                  {(!uploadedBlueprint.aiAnalysis?.isAnalyzed && uploadedBlueprint.status === 'processing') ? (
+                    <div className="flex flex-col items-center justify-center py-12 space-y-4 border-2 border-dashed border-gray-200 rounded-lg bg-gray-50">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                      <div className="text-center">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">AI Analysis in Progress</h3>
+                        <p className="text-gray-600">Our AI is analyzing your blueprint to detect mechanical symbols...</p>
+                        <p className="text-sm text-gray-500 mt-2">This usually takes 30-60 seconds</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <EnhancedSymbolAnalysis blueprint={uploadedBlueprint} />
+                  )}
+                </>
               )}
 
             </div>

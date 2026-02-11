@@ -207,6 +207,14 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
     const categoryInput = prompt('Enter category (hydraulic/hvac, pneumatic, mechanical, electrical, other):') || 'other';
     const category = normalizeCategory(categoryInput);
 
+    // Calculate average width/height of existing AI-detected symbols
+    const aiSymbols = symbols.filter(s => !s.id?.startsWith('manual-'));
+    let avgWidth = 6, avgHeight = 6;
+    if (aiSymbols.length > 0) {
+      avgWidth = aiSymbols.reduce((sum, s) => sum + (s.position?.width || 0), 0) / aiSymbols.length;
+      avgHeight = aiSymbols.reduce((sum, s) => sum + (s.position?.height || 0), 0) / aiSymbols.length;
+    }
+
     const newSymbol = {
       id: `manual-${Date.now()}`,
       name: name.trim(),
@@ -214,10 +222,10 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
       category,
       type: category,
       position: {
-        x: Math.max(0, Math.min(95, pct.x - 3)),
-        y: Math.max(0, Math.min(95, pct.y - 3)),
-        width: 6,
-        height: 6,
+        x: Math.max(0, Math.min(100 - avgWidth, pct.x - avgWidth / 2)),
+        y: Math.max(0, Math.min(100 - avgHeight, pct.y - avgHeight / 2)),
+        width: avgWidth,
+        height: avgHeight,
       },
       confidence: 1.0,
     };
@@ -397,7 +405,7 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
             />
 
             {/* Symbol Overlays */}
-          {showSymbols && showSymbolOverlays && symbols.map((symbol) => {
+          {showSymbols && showSymbolOverlays && imageLoaded && symbols.map((symbol) => {
             // Convert percentage coordinates to pixels based on actual displayed image size
             const pixelPosition = convertPercentageToPixels(symbol.position);
 
