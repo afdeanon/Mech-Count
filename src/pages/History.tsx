@@ -1,4 +1,3 @@
-import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Sidebar } from '@/components/Layout/Sidebar';
 import { Card, CardContent } from '@/components/ui/card';
@@ -80,13 +79,7 @@ export function History() {
   // Get recent blueprints (last 3)
   const recentBlueprints = sortedBlueprints.slice(0, 3);
 
-  // Get blueprints from last 30 days
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  
-  const last30DaysBlueprints = sortedBlueprints.filter(
-    blueprint => new Date(blueprint.uploadDate) >= thirtyDaysAgo
-  );
+  const allUploadedBlueprints = sortedBlueprints;
 
   const getProjectName = (projectId?: string) => {
     if (!projectId) return null;
@@ -217,10 +210,10 @@ export function History() {
             {/* Full History */}
             <div>
               <h2 className="text-xl font-semibold text-foreground mb-4">
-                Full History (Last 30 Days)
+                Full Upload History
               </h2>
               
-              {last30DaysBlueprints.length === 0 ? (
+              {allUploadedBlueprints.length === 0 ? (
                 <Card>
                   <CardContent className="p-8 text-center">
                     <FileImage className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
@@ -228,13 +221,13 @@ export function History() {
                       No Blueprints Found
                     </h3>
                     <p className="text-muted-foreground">
-                      You haven't uploaded any blueprints in the last 30 days.
+                      You haven't uploaded any blueprints yet.
                     </p>
                   </CardContent>
                 </Card>
               ) : (
                 <div className="space-y-4">
-                  {last30DaysBlueprints.map((blueprint) => (
+                  {allUploadedBlueprints.map((blueprint) => (
                     <div key={blueprint.id} className="relative">
                       <Link
                         to={`/history/blueprints/${blueprint.id}`}

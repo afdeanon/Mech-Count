@@ -1,5 +1,11 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
+type JSONTransformDoc = {
+  _id?: unknown;
+  __v?: unknown;
+  id?: unknown;
+};
+
 // User Interface
 export interface IUser extends Document {
   firebaseUid: string;
@@ -42,7 +48,7 @@ const UserSchema = new Schema<IUser>({
 }, {
   timestamps: true,
   toJSON: {
-    transform: function(doc: any, ret: any) {
+    transform: function(_doc: unknown, ret: JSONTransformDoc) {
       ret.id = ret._id;
       delete ret._id;
       delete ret.__v;

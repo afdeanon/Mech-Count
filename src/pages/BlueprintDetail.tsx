@@ -1,4 +1,4 @@
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Sidebar } from '@/components/Layout/Sidebar';
 import { Button } from '@/components/ui/button';
 import { BlueprintViewer } from '@/components/Blueprint/BlueprintViewer';
@@ -9,6 +9,7 @@ import { ArrowLeft, ChevronRight, Save } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getBlueprintById, updateBlueprint } from '@/services/blueprintService';
 import { useToast } from '@/hooks/use-toast';
+import type { Blueprint } from '@/types';
 
 export function BlueprintDetail() {
   const { blueprintId, projectId } = useParams<{ blueprintId: string; projectId?: string }>();
@@ -18,7 +19,7 @@ export function BlueprintDetail() {
   const [isLoading, setIsLoading] = useState(true);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [originalSymbols, setOriginalSymbols] = useState<any[]>([]);
+  const [originalSymbols, setOriginalSymbols] = useState<Blueprint['symbols']>([]);
   const { toast } = useToast();
 
   // Fetch latest blueprint data from server on mount
@@ -51,10 +52,6 @@ export function BlueprintDetail() {
   }, [blueprintId, dispatch]);
 
   const blueprint = state.blueprints.find(b => b.id === blueprintId);
-  const project = blueprint?.projectId 
-    ? state.projects.find(p => p.id === blueprint.projectId)
-    : null;
-
   // Show loading state while fetching
   if (isLoading) {
     return (
@@ -94,11 +91,7 @@ export function BlueprintDetail() {
     );
   }
 
-  const handleSaveToProject = () => {
-    setShowSaveModal(true);
-  };
-
-  const handleSymbolsChange = (symbols: any[]) => {
+  const handleSymbolsChange = (symbols: Blueprint['symbols']) => {
     console.log('📋 [BLUEPRINT_DETAIL] Symbols changed, updating context with', symbols.length, 'symbols');
     if (blueprint) {
       const updatedBlueprint = {

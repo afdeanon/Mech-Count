@@ -236,7 +236,7 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
       return updated;
     });
     setIsAddingSymbol(false);
-  }, [isAddingSymbol, convertPixelsToPercentage, onSymbolsChange]);
+  }, [isAddingSymbol, convertPixelsToPercentage, onSymbolsChange, symbols]);
 
   const handleDeleteSymbol = useCallback((symbolId: string) => {
     setSymbols(prev => {

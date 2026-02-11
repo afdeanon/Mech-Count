@@ -173,8 +173,8 @@ export async function uploadBlueprint(req: Request, res: Response) {
       imageUrl: blueprint.imageUrl,
       s3Key: blueprint.s3Key,
       originalFilename: blueprint.originalFilename,
-      userId: (blueprint.userId as any).toString(),
-      projectId: blueprint.projectId ? (blueprint.projectId as any).toString() : null,
+      userId: String(blueprint.userId),
+      projectId: blueprint.projectId ? String(blueprint.projectId) : null,
       symbols: blueprint.symbols,
       status: blueprint.status,
       metadata: blueprint.metadata,
@@ -269,45 +269,44 @@ export async function getUserBlueprints(req: Request, res: Response) {
       email: req.user?.email,
       name: req.user?.name
     });
-    const { projectId, status, page = 1, limit = 20 } = req.query;
+    const { projectId, status, page, limit } = req.query;
     
     // Build filter
-    const filter: any = { userId: userObjectId };
+    const filter: Record<string, unknown> = { userId: userObjectId };
     if (projectId) filter.projectId = projectId;
     if (status) filter.status = status;
 
-    const skip = (Number(page) - 1) * Number(limit);
-
-    const blueprints = await Blueprint
-      .find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit));
-      // Removed .populate('projectId') to keep projectId as ObjectId string
-      // The frontend expects projectId to be a string, not a populated object
-
     const total = await Blueprint.countDocuments(filter);
+    const hasExplicitLimit = limit !== undefined && limit !== null && limit !== '';
+    const pageNumber = Math.max(Number(page) || 1, 1);
+    const limitNumber = hasExplicitLimit ? Math.max(Number(limit) || 20, 1) : null;
+
+    let queryBuilder = Blueprint.find(filter).sort({ createdAt: -1 });
+
+    if (limitNumber !== null) {
+      const skip = (pageNumber - 1) * limitNumber;
+      queryBuilder = queryBuilder.skip(skip).limit(limitNumber);
+    }
+
+    const blueprints = await queryBuilder;
+    // Removed .populate('projectId') to keep projectId as ObjectId string
+    // The frontend expects projectId to be a string, not a populated object
 
     console.log(`📋 [DEBUG] getUserBlueprints returning ${blueprints.length} blueprints for user ${userObjectId}`);
     blueprints.forEach(bp => {
       console.log(`  - ${bp._id}: "${bp.name}" (projectId: ${bp.projectId})`);
     });
 
-    // Also log total blueprint count for this user to detect duplicates
-    const totalBlueprints = await Blueprint.find({ userId: userObjectId });
-    console.log(`📋 [DEBUG] Total blueprints in DB for user: ${totalBlueprints.length}`);
-    if (totalBlueprints.length !== blueprints.length) {
-      console.log(`📋 [WARNING] Mismatch between filtered and total blueprints! This might indicate pagination or filtering issues.`);
-    }
+    console.log(`📋 [DEBUG] Total blueprint count for current filter: ${total}`);
 
     res.json({
       success: true,
       data: blueprints,
       pagination: {
-        page: Number(page),
-        limit: Number(limit),
+        page: limitNumber !== null ? pageNumber : 1,
+        limit: limitNumber !== null ? limitNumber : total,
         total,
-        pages: Math.ceil(total / Number(limit))
+        pages: limitNumber !== null ? Math.ceil(total / limitNumber) : 1
       }
     });
 
@@ -340,9 +339,7 @@ export async function getBlueprintById(req: Request, res: Response) {
       email: req.user?.email,
       name: req.user?.name
     });
-    const blueprint = await Blueprint
-      .findOne({ _id: id, userId: userObjectId })
-      .populate('projectId', 'name description');
+    const blueprint = await Blueprint.findOne({ _id: id, userId: userObjectId });
 
     if (!blueprint) {
       return res.status(404).json({
@@ -399,7 +396,7 @@ export async function updateBlueprint(req: Request, res: Response) {
     });
 
     // Find and update the blueprint  
-    const updateData: any = {
+    const updateData: Record<string, unknown> = {
       updatedAt: new Date()
     };
     

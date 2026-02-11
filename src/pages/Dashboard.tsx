@@ -7,6 +7,7 @@ import { SaveToProjectModal } from '@/components/Project/SaveToProjectModal';
 import { Button } from '@/components/ui/button';
 import { Blueprint } from '@/types';
 import { deleteBlueprint, getBlueprintById } from '@/services/blueprintService';
+import { useApp } from '@/context/AppContext';
 import { Save, Upload, Brain, FileImage, RefreshCw } from 'lucide-react';
 import {
   AlertDialog,
@@ -20,30 +21,33 @@ import {
 } from '@/components/ui/alert-dialog';
 
 export function Dashboard() {
+  const { state, dispatch } = useApp();
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [isPollingForUpdates, setIsPollingForUpdates] = useState(false);
 
-  // Use LOCAL state for uploaded blueprints in this session only
-  const [uploadedBlueprint, setUploadedBlueprint] = useState<Blueprint | null>(null);
+  const uploadedBlueprint = state.currentBlueprint;
   const [originalFile, setOriginalFile] = useState<File | null>(null);
 
 
   // Poll for blueprint updates when status is 'processing'
   useEffect(() => {
-    if (!uploadedBlueprint || uploadedBlueprint.status !== 'processing') {
+    const currentBlueprintId = uploadedBlueprint?.id;
+    const currentBlueprintStatus = uploadedBlueprint?.status;
+
+    if (!currentBlueprintId || currentBlueprintStatus !== 'processing') {
       setIsPollingForUpdates(false);
       return;
     }
 
     setIsPollingForUpdates(true);
-    console.log('🔄 Starting to poll for blueprint updates...', uploadedBlueprint.id);
+    console.log('🔄 Starting to poll for blueprint updates...', currentBlueprintId);
 
     const pollInterval = setInterval(async () => {
       try {
-        console.log('🔄 Polling for blueprint updates...', uploadedBlueprint.id);
-        const result = await getBlueprintById(uploadedBlueprint.id);
+        console.log('🔄 Polling for blueprint updates...', currentBlueprintId);
+        const result = await getBlueprintById(currentBlueprintId);
 
         if (result.success && result.data) {
           const updatedBlueprint = result.data;
@@ -56,7 +60,7 @@ export function Dashboard() {
           console.log('📋 Raw blueprint data:', JSON.stringify(updatedBlueprint, null, 2));
 
           // Update local state with new data
-          setUploadedBlueprint(updatedBlueprint);
+          dispatch({ type: 'SET_CURRENT_BLUEPRINT', payload: updatedBlueprint });
 
           // Stop polling if analysis is complete or failed
           if (updatedBlueprint.status === 'completed' || updatedBlueprint.status === 'failed') {
@@ -83,7 +87,7 @@ export function Dashboard() {
       clearTimeout(maxPollTime);
       setIsPollingForUpdates(false);
     };
-  }, [uploadedBlueprint?.id, uploadedBlueprint?.status]);
+  }, [dispatch, uploadedBlueprint?.id, uploadedBlueprint?.status]);
 
   const handleManualRefresh = async () => {
     if (!uploadedBlueprint?.id) return;
@@ -93,7 +97,7 @@ export function Dashboard() {
       const result = await getBlueprintById(uploadedBlueprint.id);
       if (result.success && result.data) {
         console.log('📋 Manual refresh - received data:', result.data);
-        setUploadedBlueprint(result.data);
+        dispatch({ type: 'SET_CURRENT_BLUEPRINT', payload: result.data });
       } else {
         console.error('❌ Manual refresh failed:', result.message);
       }
@@ -105,22 +109,22 @@ export function Dashboard() {
   const handleBlueprintUploaded = (blueprint: Blueprint, file?: File) => {
     console.log('📋 [DASHBOARD] Blueprint uploaded, received:', blueprint);
     // Store in local state instead of global context
-    setUploadedBlueprint(blueprint);
+    dispatch({ type: 'SET_CURRENT_BLUEPRINT', payload: blueprint });
     setOriginalFile(file || null);
     // Draft is already stored in context by UploadArea
   };
 
-  const handleSymbolsChange = (symbols: any[]) => {
+  const handleSymbolsChange = (symbols: Blueprint['symbols']) => {
     console.log('📋 [DASHBOARD] Symbols changed, updating blueprint with', symbols.length, 'symbols');
     if (uploadedBlueprint) {
-      setUploadedBlueprint({
+      dispatch({ type: 'SET_CURRENT_BLUEPRINT', payload: {
         ...uploadedBlueprint,
         symbols: symbols,
         totalSymbols: symbols.length,
         averageAccuracy: symbols.length > 0
           ? symbols.reduce((sum, s) => sum + s.confidence, 0) / symbols.length
           : 0
-      });
+      }});
     }
   };
 
@@ -142,7 +146,7 @@ export function Dashboard() {
     }
 
     // Clear local state to allow new upload
-    setUploadedBlueprint(null);
+    dispatch({ type: 'SET_CURRENT_BLUEPRINT', payload: null });
     setOriginalFile(null);
     setIsProcessing(false);
     setShowConfirmDialog(false);
@@ -235,8 +239,8 @@ export function Dashboard() {
         onSaved={(updatedBlueprint?: Blueprint) => {
           console.log('📋 [Dashboard] Blueprint saved successfully:', updatedBlueprint);
           setShowSaveModal(false);
-          // Clear local state after successful save
-          setUploadedBlueprint(null);
+          // Clear persisted draft after successful save
+          dispatch({ type: 'SET_CURRENT_BLUEPRINT', payload: null });
           setOriginalFile(null);
 
           // Clean up local blob URL if it exists

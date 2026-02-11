@@ -47,15 +47,16 @@ async function testAWSCredentials() {
       }
     }
     
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
     console.log('❌ S3 Connection failed:');
-    console.log(`Error: ${error.message}`);
+    console.log(`Error: ${message}`);
     
-    if (error.message.includes('InvalidAccessKeyId')) {
+    if (message.includes('InvalidAccessKeyId')) {
       console.log('💡 Fix: Check your AWS_ACCESS_KEY_ID');
-    } else if (error.message.includes('SignatureDoesNotMatch')) {
+    } else if (message.includes('SignatureDoesNotMatch')) {
       console.log('💡 Fix: Check your AWS_SECRET_ACCESS_KEY');
-    } else if (error.message.includes('TokenRefreshRequired')) {
+    } else if (message.includes('TokenRefreshRequired')) {
       console.log('💡 Fix: Your credentials may have expired');
     }
   }

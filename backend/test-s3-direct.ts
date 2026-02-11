@@ -28,8 +28,9 @@ async function testS3Upload() {
   try {
     fs.writeFileSync(testImagePath, imageBuffer);
     console.log('✅ Test image created successfully');
-  } catch (error: any) {
-    console.log('❌ Failed to create test image:', error?.message || error);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log('❌ Failed to create test image:', message);
     return;
   }
   
@@ -68,17 +69,18 @@ async function testS3Upload() {
       console.log(`Got: ${uploadResult.url}`);
     }
     
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
     console.log('❌ S3 upload failed:');
-    console.log(`Error: ${error?.message || error}`);
+    console.log(`Error: ${message}`);
     
-    if (error?.message?.includes('NoSuchBucket')) {
+    if (message.includes('NoSuchBucket')) {
       console.log('💡 Fix: Check if your S3 bucket exists and name is correct');
-    } else if (error?.message?.includes('AccessDenied')) {
+    } else if (message.includes('AccessDenied')) {
       console.log('💡 Fix: Check your AWS credentials and bucket permissions');
-    } else if (error?.message?.includes('InvalidAccessKeyId')) {
+    } else if (message.includes('InvalidAccessKeyId')) {
       console.log('💡 Fix: Check your AWS_ACCESS_KEY_ID');
-    } else if (error?.message?.includes('SignatureDoesNotMatch')) {
+    } else if (message.includes('SignatureDoesNotMatch')) {
       console.log('💡 Fix: Check your AWS_SECRET_ACCESS_KEY');
     }
   }
@@ -87,8 +89,9 @@ async function testS3Upload() {
   try {
     fs.unlinkSync(testImagePath);
     console.log('\n🧹 Test file cleaned up');
-  } catch (error: any) {
-    console.log('\n⚠️  Could not clean up test file:', error?.message || error);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.log('\n⚠️  Could not clean up test file:', message);
   }
   
   console.log('\n📝 Test Summary:');

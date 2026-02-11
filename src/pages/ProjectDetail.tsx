@@ -16,7 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 // Utility function
-const safeFormatDate = (dateValue: any, formatString: string, fallback = 'Unknown date') => {
+const safeFormatDate = (dateValue: string | number | Date | undefined | null, formatString: string, fallback = 'Unknown date') => {
   try {
     const date = new Date(dateValue);
     return isNaN(date.getTime()) ? fallback : format(date, formatString);
@@ -52,8 +52,14 @@ const ErrorState = ({ message, onBack }: { message: string; onBack: () => void }
   </div>
 );
 
+interface BlueprintCardProps {
+  blueprint: Blueprint;
+  projectId?: string;
+  onRemove: () => void;
+}
+
 // Blueprint Card Component
-const BlueprintCard = ({ blueprint, projectId, onRemove }: any) => (
+const BlueprintCard = ({ blueprint, projectId, onRemove }: BlueprintCardProps) => (
   <div className="relative">
     <Link to={`/projects/${projectId}/blueprints/${blueprint.id}`} className="block">
       <Card className="project-card h-full">
@@ -96,8 +102,14 @@ const BlueprintCard = ({ blueprint, projectId, onRemove }: any) => (
   </div>
 );
 
+interface AvailableBlueprintItemProps {
+  blueprint: Blueprint;
+  selected: boolean;
+  onSelect: (checked: boolean) => void;
+}
+
 // Available Blueprint Item
-const AvailableBlueprintItem = ({ blueprint, selected, onSelect }: any) => (
+const AvailableBlueprintItem = ({ blueprint, selected, onSelect }: AvailableBlueprintItemProps) => (
   <Card className={`hover:shadow-medium transition-all cursor-pointer ${selected ? 'ring-2 ring-primary bg-primary/5' : ''}`}>
     <CardContent className="p-4">
       <div className="flex items-center gap-3">
@@ -304,7 +316,11 @@ export function ProjectDetail() {
                           selected={selectedBlueprints.has(bp.id)}
                           onSelect={(checked: boolean) => {
                             const newSet = new Set(selectedBlueprints);
-                            checked ? newSet.add(bp.id) : newSet.delete(bp.id);
+                            if (checked) {
+                              newSet.add(bp.id);
+                            } else {
+                              newSet.delete(bp.id);
+                            }
                             setSelectedBlueprints(newSet);
                           }}
                         />

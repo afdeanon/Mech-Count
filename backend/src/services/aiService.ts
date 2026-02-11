@@ -28,6 +28,23 @@ export interface SymbolAnalysisResult {
   summary: string;
 }
 
+interface RawAISymbol {
+  name?: string;
+  description?: string;
+  confidence?: number;
+  category?: string;
+  coordinates?: unknown;
+}
+
+interface ParsedAIResponse {
+  symbols?: RawAISymbol[];
+  summary?: string;
+  overallConfidence?: number;
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
 /**
  * Map AI response categories to expected DetectedSymbol categories
  */
@@ -70,8 +87,8 @@ export const analyzeBlueprint = async (
     const dataUrl = `data:${mimeType};base64,${base64Image}`;
 
     // Utility: clamp and sanitize boxes (percentages)
-    const clampBox = (coords: any) => {
-      const safe = coords || {};
+    const clampBox = (coords: unknown) => {
+      const safe = isRecord(coords) ? coords : {};
       const width = Math.min(12, Math.max(3, Number(safe.width ?? 7)));
       const height = Math.min(12, Math.max(3, Number(safe.height ?? 7)));
       const x = Math.min(100, Math.max(0, Number(safe.x ?? 50)));
@@ -583,7 +600,7 @@ Return ONLY valid JSON with NO markdown backticks:
     }
 
     // Extract JSON from the response
-    let analysisData;
+    let analysisData: ParsedAIResponse = {};
     try {
       // Try multiple patterns to extract JSON
       let jsonString = aiResponse.trim();
@@ -605,14 +622,16 @@ Return ONLY valid JSON with NO markdown backticks:
         }
       }
 
-      analysisData = JSON.parse(jsonString);
+      const parsed = JSON.parse(jsonString) as unknown;
+      analysisData = isRecord(parsed) ? (parsed as ParsedAIResponse) : {};
       console.log('🤖 Successfully parsed JSON:', analysisData);
 
       // Log detailed symbol data for debugging
       if (analysisData.symbols && analysisData.symbols.length > 0) {
         console.log(`🔍 AI returned ${analysisData.symbols.length} symbols:`);
-        analysisData.symbols.forEach((symbol: any, index: number) => {
-          console.log(`  Symbol ${index + 1}: "${symbol.name}" - confidence: ${symbol.confidence}, category: ${symbol.category}, coords: (${symbol.coordinates?.x}, ${symbol.coordinates?.y})`);
+        analysisData.symbols.forEach((symbol: RawAISymbol, index: number) => {
+          const coords = clampBox(symbol.coordinates);
+          console.log(`  Symbol ${index + 1}: "${symbol.name}" - confidence: ${symbol.confidence}, category: ${symbol.category}, coords: (${coords.x}, ${coords.y})`);
         });
       } else {
         console.log('⚠️ No symbols returned by AI or symbols array is empty');
@@ -638,7 +657,7 @@ Return ONLY valid JSON with NO markdown backticks:
     const meta = await sharp(imageBuffer).metadata();
 
     // Structure the final result - map AI response to DetectedSymbol interface
-    const symbolsArray = await Promise.all((analysisData.symbols || []).map(async (symbol: any) => {
+    const symbolsArray = await Promise.all((analysisData.symbols || []).map(async (symbol: RawAISymbol) => {
       // Handle confidence conversion more carefully
       let confidence = symbol.confidence || 0;
 
@@ -672,13 +691,13 @@ Return ONLY valid JSON with NO markdown backticks:
         name,
         description,
         confidence: confidence,
-        category: mapCategoryToExpectedFormat(symbol.category) as any,
+        category: mapCategoryToExpectedFormat(symbol.category || ''),
         coordinates: recentered
       };
     }));
 
     // Filter out obviously bad boxes after clamping
-    const symbols = symbolsArray.filter((s: any) => Number.isFinite(s.coordinates.x) && Number.isFinite(s.coordinates.y));
+    const symbols = symbolsArray.filter((s) => Number.isFinite(s.coordinates?.x) && Number.isFinite(s.coordinates?.y));
 
     const result: SymbolAnalysisResult = {
       symbols,
@@ -695,19 +714,25 @@ Return ONLY valid JSON with NO markdown backticks:
     return result;
 
   } catch (error) {
+    const errorObject = isRecord(error) ? error : {};
+    const errorMessage = typeof errorObject.message === 'string' ? errorObject.message : 'Unknown error';
+    const errorCode = typeof errorObject.code === 'string' ? errorObject.code : undefined;
+    const errorType = typeof errorObject.type === 'string' ? errorObject.type : undefined;
+    const errorStatus = typeof errorObject.status === 'number' ? errorObject.status : undefined;
+
     console.error('Error in AI blueprint analysis:', error);
     console.error('Error details:', {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      code: (error as any)?.code,
-      type: (error as any)?.type,
-      status: (error as any)?.status
+      message: errorMessage,
+      code: errorCode,
+      type: errorType,
+      status: errorStatus
     });
 
     // Enhanced fallback for development and testing
     const isDevelopment = process.env.NODE_ENV === 'development';
-    const isQuotaError = (error as any)?.code === 'insufficient_quota' ||
-      (error as any)?.message?.includes('quota') ||
-      (error as any)?.message?.includes('billing');
+    const isQuotaError = errorCode === 'insufficient_quota' ||
+      errorMessage.includes('quota') ||
+      errorMessage.includes('billing');
 
     // Provide enhanced mock data for testing and development
     if (isDevelopment || isQuotaError) {

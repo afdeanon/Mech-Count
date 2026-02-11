@@ -3,8 +3,28 @@ import { Project } from '@/types';
 
 const API_BASE_URL = 'http://localhost:3000/api';
 
+interface ApiProject {
+  id?: string;
+  _id?: string;
+  name?: string;
+  description?: string;
+  createdAt?: string | Date;
+  blueprints?: Project['blueprints'];
+  blueprintIds?: Project['blueprints'];
+  [key: string]: unknown;
+}
+
+interface ApiEnvelope<T> {
+  success?: boolean;
+  data?: T;
+  message?: string;
+}
+
+const getErrorMessage = (error: unknown, fallback: string): string =>
+  error instanceof Error ? error.message : fallback;
+
 // Transform project data from API to frontend format
-function transformProject(apiProject: any): Project {
+function transformProject(apiProject: ApiProject): Project {
   return {
     ...apiProject,
     id: apiProject._id || apiProject.id, // Ensure we have 'id' field from '_id'
@@ -57,19 +77,19 @@ export interface UpdateProjectRequest {
   description?: string;
 }
 
-export interface ProjectResponse {
+export interface ProjectResponse<T = unknown> {
   success: boolean;
-  data?: any;
+  data?: T;
   message?: string;
 }
 
 // Get all projects for the user
-export async function getUserProjects(): Promise<ProjectResponse> {
+export async function getUserProjects(): Promise<ProjectResponse<Project[]>> {
   try {
     console.log('📁 Fetching user projects...');
     
     const response = await authenticatedFetch('/projects');
-    const result = await response.json();
+    const result = (await response.json()) as ApiEnvelope<ApiProject[]>;
 
     if (!response.ok) {
       throw new Error(result.message || 'Failed to fetch projects');
@@ -84,22 +104,22 @@ export async function getUserProjects(): Promise<ProjectResponse> {
       data: transformedProjects,
       message: result.message
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Error fetching projects:', error);
     return {
       success: false,
-      message: error.message
+      message: getErrorMessage(error, 'Failed to fetch projects')
     };
   }
 }
 
 // Get a single project by ID
-export async function getProject(projectId: string): Promise<ProjectResponse> {
+export async function getProject(projectId: string): Promise<ProjectResponse<Project>> {
   try {
     console.log('📁 Fetching project:', projectId);
     
     const response = await authenticatedFetch(`/projects/${projectId}`);
-    const result = await response.json();
+    const result = (await response.json()) as ApiEnvelope<ApiProject>;
 
     if (!response.ok) {
       throw new Error(result.message || 'Failed to fetch project');
@@ -114,17 +134,17 @@ export async function getProject(projectId: string): Promise<ProjectResponse> {
       data: transformedProject,
       message: result.message
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Error fetching project:', error);
     return {
       success: false,
-      message: error.message
+      message: getErrorMessage(error, 'Failed to fetch project')
     };
   }
 }
 
 // Create a new project
-export async function createProject(projectData: CreateProjectRequest): Promise<ProjectResponse> {
+export async function createProject(projectData: CreateProjectRequest): Promise<ProjectResponse<Project>> {
   try {
     console.log('📁 Creating project:', projectData);
     
@@ -133,7 +153,7 @@ export async function createProject(projectData: CreateProjectRequest): Promise<
       body: JSON.stringify(projectData),
     });
 
-    const result = await response.json();
+    const result = (await response.json()) as ApiEnvelope<ApiProject>;
 
     if (!response.ok) {
       throw new Error(result.message || 'Failed to create project');
@@ -148,17 +168,17 @@ export async function createProject(projectData: CreateProjectRequest): Promise<
       data: transformedProject,
       message: result.message
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Error creating project:', error);
     return {
       success: false,
-      message: error.message
+      message: getErrorMessage(error, 'Failed to create project')
     };
   }
 }
 
 // Update a project
-export async function updateProject(projectId: string, projectData: UpdateProjectRequest): Promise<ProjectResponse> {
+export async function updateProject(projectId: string, projectData: UpdateProjectRequest): Promise<ProjectResponse<Project>> {
   try {
     console.log('📁 Updating project:', projectId, projectData);
     
@@ -167,7 +187,7 @@ export async function updateProject(projectId: string, projectData: UpdateProjec
       body: JSON.stringify(projectData),
     });
 
-    const result = await response.json();
+    const result = (await response.json()) as ApiEnvelope<ApiProject>;
 
     if (!response.ok) {
       throw new Error(result.message || 'Failed to update project');
@@ -176,20 +196,20 @@ export async function updateProject(projectId: string, projectData: UpdateProjec
     console.log('✅ Project updated successfully:', result.data);
     return {
       success: true,
-      data: result.data,
+      data: result.data ? transformProject(result.data) : undefined,
       message: result.message
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Error updating project:', error);
     return {
       success: false,
-      message: error.message
+      message: getErrorMessage(error, 'Failed to update project')
     };
   }
 }
 
 // Delete a project
-export async function deleteProject(projectId: string): Promise<ProjectResponse> {
+export async function deleteProject(projectId: string): Promise<ProjectResponse<{ deletedBlueprints?: number }>> {
   try {
     console.log('📁 Deleting project:', projectId);
     
@@ -197,7 +217,7 @@ export async function deleteProject(projectId: string): Promise<ProjectResponse>
       method: 'DELETE',
     });
 
-    const result = await response.json();
+    const result = (await response.json()) as ApiEnvelope<{ deletedBlueprints?: number }>;
 
     if (!response.ok) {
       throw new Error(result.message || 'Failed to delete project');
@@ -208,17 +228,17 @@ export async function deleteProject(projectId: string): Promise<ProjectResponse>
       success: true,
       message: result.message
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Error deleting project:', error);
     return {
       success: false,
-      message: error.message
+      message: getErrorMessage(error, 'Failed to delete project')
     };
   }
 }
 
 // Add blueprint to project
-export async function addBlueprintToProject(projectId: string, blueprintId: string): Promise<ProjectResponse> {
+export async function addBlueprintToProject(projectId: string, blueprintId: string): Promise<ProjectResponse<Project>> {
   try {
     console.log('📎 Adding blueprint to project:', { projectId, blueprintId });
     
@@ -227,7 +247,7 @@ export async function addBlueprintToProject(projectId: string, blueprintId: stri
       body: JSON.stringify({ blueprintId }),
     });
 
-    const result = await response.json();
+    const result = (await response.json()) as ApiEnvelope<ApiProject>;
 
     if (!response.ok) {
       throw new Error(result.message || 'Failed to add blueprint to project');
@@ -236,20 +256,20 @@ export async function addBlueprintToProject(projectId: string, blueprintId: stri
     console.log('✅ Blueprint added to project successfully:', result.data);
     return {
       success: true,
-      data: result.data,
+      data: result.data ? transformProject(result.data) : undefined,
       message: result.message
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Error adding blueprint to project:', error);
     return {
       success: false,
-      message: error.message
+      message: getErrorMessage(error, 'Failed to add blueprint to project')
     };
   }
 }
 
 // Remove blueprint from project
-export async function removeBlueprintFromProject(projectId: string, blueprintId: string): Promise<ProjectResponse> {
+export async function removeBlueprintFromProject(projectId: string, blueprintId: string): Promise<ProjectResponse<Project>> {
   try {
     console.log('📎 Removing blueprint from project:', { projectId, blueprintId });
     
@@ -257,7 +277,7 @@ export async function removeBlueprintFromProject(projectId: string, blueprintId:
       method: 'DELETE',
     });
 
-    const result = await response.json();
+    const result = (await response.json()) as ApiEnvelope<ApiProject>;
 
     if (!response.ok) {
       throw new Error(result.message || 'Failed to remove blueprint from project');
@@ -266,14 +286,14 @@ export async function removeBlueprintFromProject(projectId: string, blueprintId:
     console.log('✅ Blueprint removed from project successfully:', result.data);
     return {
       success: true,
-      data: result.data,
+      data: result.data ? transformProject(result.data) : undefined,
       message: result.message
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('❌ Error removing blueprint from project:', error);
     return {
       success: false,
-      message: error.message
+      message: getErrorMessage(error, 'Failed to remove blueprint from project')
     };
   }
 }

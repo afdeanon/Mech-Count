@@ -1,5 +1,11 @@
 import mongoose, { Document, Schema, Model } from 'mongoose';
 
+type JSONTransformDoc = {
+  _id?: unknown;
+  __v?: unknown;
+  id?: unknown;
+};
+
 // AI Usage Interface
 export interface IAIUsage extends Document {
   userId: mongoose.Types.ObjectId;
@@ -89,7 +95,7 @@ const AIUsageSchema = new Schema<IAIUsage>({
 }, {
   timestamps: true,
   toJSON: {
-    transform: function(doc: any, ret: any) {
+    transform: function(_doc: unknown, ret: JSONTransformDoc) {
       ret.id = ret._id;
       delete ret._id;
       delete ret.__v;

@@ -1,5 +1,11 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
+type JSONTransformDoc = {
+  _id?: unknown;
+  __v?: unknown;
+  id?: unknown;
+};
+
 // Mechanical Symbol Interface
 export interface IMechanicalSymbol {
   id: string;
@@ -155,7 +161,7 @@ const BlueprintSchema = new Schema<IBlueprint>({
 }, {
   timestamps: true,
   toJSON: {
-    transform: function(doc: any, ret: any) {
+    transform: function(_doc: unknown, ret: JSONTransformDoc) {
       ret.id = ret._id;
       delete ret._id;
       delete ret.__v;

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from 'react';
 import { AppState, Blueprint, Project, User } from '@/types';
 import { onAuthStateChange } from '@/services/authService';
@@ -62,7 +63,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
           isAuthenticated: false,
           user: null,
           isLoading: false
-        }
+        },
+        currentBlueprint: null,
+        currentProject: null
       };
     
     case 'SET_AUTH_LOADING':
@@ -171,8 +174,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (response.success && response.data) {
         console.log('📋 Loaded blueprints:', response.data);
         // Debug: Check projectId values
-        response.data.forEach((bp: any) => {
-          console.log(`  - Blueprint ${bp._id || bp.id}: "${bp.name}" (projectId: ${bp.projectId})`);
+        response.data.forEach((bp) => {
+          console.log(`  - Blueprint ${bp.id}: "${bp.name}" (projectId: ${bp.projectId})`);
         });
         dispatch({ type: 'SET_BLUEPRINTS', payload: response.data });
       } else {

@@ -19,7 +19,7 @@ export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing,
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
 
-  const processUpload = async (file: File) => {
+  const processUpload = useCallback(async (file: File) => {
     setIsProcessing(true);
     setUploadStatus('uploading');
     setProgress(0);
@@ -63,6 +63,7 @@ export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing,
       setProgress(70);
 
       // Step 3: Create blueprint object from response
+      const uploadStatus = uploadResult.data?.status || 'processing';
       const blueprint: Blueprint = {
         id: uploadResult.data._id || uploadResult.data.id,
         name: uploadResult.data.name || file.name.replace(/\.[^/.]+$/, ''),
@@ -72,12 +73,14 @@ export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing,
         symbols: uploadResult.data.symbols || [],
         totalSymbols: uploadResult.data.totalSymbols || 0,
         averageAccuracy: uploadResult.data.averageAccuracy || 0,
-        status: uploadResult.data.status || 'completed',
+        status: uploadStatus,
         projectId: projectId, // Assign to project if provided
         aiAnalysis: uploadResult.data.aiAnalysis || {
-          isAnalyzed: true,
+          isAnalyzed: uploadStatus === 'completed',
           confidence: uploadResult.data.averageAccuracy || 0,
-          summary: 'Blueprint uploaded successfully'
+          summary: uploadStatus === 'completed'
+            ? 'Blueprint uploaded successfully'
+            : 'AI analysis is in progress'
         }
       };
 
@@ -100,16 +103,17 @@ export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing,
         setUploadStatus('idle');
       }, 1000);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       // Clear timeout on error
       clearTimeout(uploadTimeout);
       console.error('Upload error:', error);
-      setErrorMessage(error.message || 'Upload failed');
+      const message = error instanceof Error ? error.message : 'Upload failed';
+      setErrorMessage(message);
       setUploadStatus('error');
       setIsProcessing(false);
       setProgress(0);
     }
-  };
+  }, [onBlueprintUploaded, projectId, setIsProcessing]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -117,7 +121,7 @@ export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing,
       setUploadedFile(file);
       processUpload(file);
     }
-  }, []);
+  }, [processUpload]);
 
   const { getRootProps, getInputProps, isDragActive, isDragReject } = useDropzone({
     onDrop,
