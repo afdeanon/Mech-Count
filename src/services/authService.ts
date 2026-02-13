@@ -10,6 +10,7 @@ import {
   AuthError
 } from 'firebase/auth';
 import { auth, googleProvider } from '@/config/firebase';
+import { getDefaultAvatar } from '@/lib/avatar';
 import { User } from '@/types';
 
 // Custom error handling
@@ -40,11 +41,14 @@ export const getAuthErrorMessage = (error: AuthError): string => {
 
 // Convert Firebase user to our User type
 export const convertFirebaseUser = (firebaseUser: FirebaseUser): User => {
+  const name = firebaseUser.displayName || firebaseUser.email || 'User';
+  const email = firebaseUser.email || '';
+
   return {
     id: firebaseUser.uid,
-    email: firebaseUser.email || '',
-    name: firebaseUser.displayName || firebaseUser.email || 'User',
-    avatar: firebaseUser.photoURL || undefined
+    email,
+    name,
+    avatar: firebaseUser.photoURL || getDefaultAvatar(name, email)
   };
 };
 

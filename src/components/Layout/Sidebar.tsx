@@ -4,6 +4,7 @@ import { Upload, History, FolderOpen, FileText, LogOut, ChevronUp, ChevronDown }
 import { Button } from '@/components/ui/button';
 import { useApp } from '@/context/AppContext';
 import { signOutUser } from '@/services/authService';
+import { getDefaultAvatar } from '@/lib/avatar';
 import { cn } from '@/lib/utils';
 
 const navigation = [
@@ -27,6 +28,7 @@ const navigation = [
 export function Sidebar() {
   const { state, dispatch } = useApp();
   const [showLogout, setShowLogout] = useState(false);
+  const user = state.auth.user;
 
   const handleLogout = async () => {
     try {
@@ -38,7 +40,7 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="fixed left-0 top-0 w-64 bg-card border-r border-border h-screen flex flex-col z-40">
+    <aside className="fixed left-0 top-0 w-56 bg-card border-r border-border h-screen flex flex-col z-40">
       {/* Logo */}
       <div className="p-6 border-b border-border">
         <div className="flex items-center gap-3">
@@ -50,8 +52,8 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="p-4 flex-1">
-        <ul className="space-y-2">
+      <nav className="p-3 flex-1">
+        <ul className="space-y-1">
           {navigation.map((item) => (
             <li key={item.name}>
               <NavLink
@@ -63,7 +65,7 @@ export function Sidebar() {
                   )
                 }
               >
-                <item.icon className="w-5 h-5" />
+                <item.icon className="w-4 h-4" />
                 <span>{item.name}</span>
               </NavLink>
             </li>
@@ -78,16 +80,20 @@ export function Sidebar() {
           onClick={() => setShowLogout(!showLogout)}
         >
           <img 
-            src={state.auth.user?.avatar} 
-            alt={state.auth.user?.name}
+            src={user?.avatar || getDefaultAvatar(user?.name, user?.email)}
+            alt={user?.name || 'User avatar'}
+            onError={(event) => {
+              event.currentTarget.onerror = null;
+              event.currentTarget.src = getDefaultAvatar(user?.name, user?.email);
+            }}
             className="w-8 h-8 rounded-full"
           />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-foreground truncate">
-              {state.auth.user?.name}
+              {user?.name}
             </p>
             <p className="text-xs text-muted-foreground truncate">
-              {state.auth.user?.email}
+              {user?.email}
             </p>
           </div>
           {showLogout ? (

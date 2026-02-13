@@ -3,23 +3,26 @@ import { Sidebar } from '@/components/Layout/Sidebar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useApp } from '@/context/AppContext';
-import { Calendar, FileImage, BarChart3, MoreVertical, Trash2 } from 'lucide-react';
+import { Calendar, FileImage, BarChart3, MoreVertical, Search, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { deleteBlueprint } from '@/services/blueprintService';
 import { useToast } from '@/hooks/use-toast';
+import { useState } from 'react';
 
 export function History() {
   const { state, dispatch } = useApp();
   const { toast } = useToast();
+  const [historySearchTerm, setHistorySearchTerm] = useState('');
 
   // Show loading state if auth is still loading
   if (state.auth.isLoading) {
     return (
       <div className="min-h-screen bg-background">
         <Sidebar />
-        <main className="ml-64 p-6">
+        <main className="ml-56 p-5">
           <div className="max-w-6xl mx-auto space-y-8">
             <div>
               <h1 className="text-3xl font-bold text-foreground mb-2">
@@ -80,6 +83,9 @@ export function History() {
   const recentBlueprints = sortedBlueprints.slice(0, 3);
 
   const allUploadedBlueprints = sortedBlueprints;
+  const filteredFullHistoryBlueprints = allUploadedBlueprints.filter((blueprint) =>
+    blueprint.name.toLowerCase().includes(historySearchTerm.toLowerCase())
+  );
 
   const getProjectName = (projectId?: string) => {
     if (!projectId) return null;
@@ -107,7 +113,7 @@ export function History() {
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
-      <main className="ml-64 p-6">
+      <main className="ml-56 p-5">
           <div className="max-w-6xl mx-auto space-y-8">
             <div>
               <h1 className="text-3xl font-bold text-foreground mb-2">
@@ -140,9 +146,18 @@ export function History() {
                             />
                           </div>
                           <CardContent className="p-0">
-                            <h3 className="text-lg font-semibold text-foreground mb-2">
-                              {blueprint.name}
-                            </h3>
+                            {/* Blueprint Name (left) and Project Badge (right) */}
+                            <div className="flex items-start justify-between mb-2">
+                              <h3 className="text-lg font-semibold text-foreground mb-1 truncate">
+                                {blueprint.name}
+                              </h3>
+                              {blueprint.projectId && (
+                                <Badge variant="outline" className="text-xs bg-white/90 text-gray-800">
+                                  {getProjectName(blueprint.projectId)}
+                                </Badge>
+                              )}
+                            </div>
+                            
                             
                             <div className="space-y-2 mb-4">
                               <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -154,14 +169,6 @@ export function History() {
                                 <BarChart3 className="w-4 h-4" />
                                 <span>{blueprint.totalSymbols} symbols detected</span>
                               </div>
-                            </div>
-
-                            <div className="flex items-center justify-between">
-                              {blueprint.projectId && (
-                                <Badge variant="outline" className="text-xs bg-white/90 text-gray-800">
-                                  {getProjectName(blueprint.projectId)}
-                                </Badge>
-                              )}
                             </div>
                           </CardContent>
                         </Card>
@@ -212,6 +219,15 @@ export function History() {
               <h2 className="text-xl font-semibold text-foreground mb-4">
                 Full Upload History
               </h2>
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search blueprints by name..."
+                  value={historySearchTerm}
+                  onChange={(e) => setHistorySearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
               
               {allUploadedBlueprints.length === 0 ? (
                 <Card>
@@ -225,16 +241,28 @@ export function History() {
                     </p>
                   </CardContent>
                 </Card>
+              ) : filteredFullHistoryBlueprints.length === 0 ? (
+                <Card>
+                  <CardContent className="p-8 text-center">
+                    <FileImage className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-foreground mb-2">
+                      No Matching Blueprints
+                    </h3>
+                    <p className="text-muted-foreground">
+                      No blueprint matches your search.
+                    </p>
+                  </CardContent>
+                </Card>
               ) : (
                 <div className="space-y-4">
-                  {allUploadedBlueprints.map((blueprint) => (
+                  {filteredFullHistoryBlueprints.map((blueprint) => (
                     <div key={blueprint.id} className="relative">
                       <Link
                         to={`/history/blueprints/${blueprint.id}`}
                         className="block"
                       >
                         <Card className="hover:shadow-medium hover:scale-[1.01] transition-all duration-200">
-                          <CardContent className="p-6">
+                          <CardContent className="p-6 min-h-[144px]">
                             <div className="flex items-start gap-4">
                               <div className="w-20 h-16 bg-muted rounded-lg overflow-hidden flex-shrink-0">
                                 <img
@@ -251,11 +279,9 @@ export function History() {
                                   </h3>
                                 </div>
                                 
-                                {blueprint.description && (
-                                  <p className="text-muted-foreground text-sm mb-3 line-clamp-2">
-                                    {blueprint.description}
-                                  </p>
-                                )}
+                                <p className="text-muted-foreground text-sm mb-3 max-w-[70%] truncate">
+                                  {blueprint.description?.trim() || 'No description'}
+                                </p>
                                 
                                 <div className="flex items-center gap-6 text-sm text-muted-foreground">
                                   <div className="flex items-center gap-2">
@@ -274,16 +300,15 @@ export function History() {
                         </Card>
                       </Link>
 
-                      {/* Accuracy badge, project badge, and Three-dot menu */}
                       <div className="absolute top-4 right-4 flex items-center gap-2">
-                        <Badge variant="secondary" className="text-xs bg-white/90 text-gray-800">
-                          {getAccuracyPercentage(blueprint)}% accuracy
-                        </Badge>
                         {blueprint.projectId && (
                           <Badge variant="outline" className="text-xs bg-white/90 text-gray-800">
                             {getProjectName(blueprint.projectId)}
                           </Badge>
                         )}
+                        <Badge variant="secondary" className=" text-xs bg-white/90 text-gray-800">
+                          {getAccuracyPercentage(blueprint)}% accuracy
+                        </Badge>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button

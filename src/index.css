@@ -135,6 +135,10 @@
 }
 
 @layer base {
+  html {
+    font-size: 15px;
+  }
+
   * {
     @apply border-border;
   }
@@ -184,11 +188,11 @@
 
   /* Navigation Styles */
   .nav-link {
-    @apply flex items-center gap-3 px-4 py-3 text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-lg transition-all duration-200;
+    @apply flex items-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-secondary/50 rounded-md transition-all duration-200;
   }
 
   .nav-link-active {
-    @apply bg-primary/10 text-primary border-r-2 border-primary;
+    @apply bg-primary/10 text-primary;
   }
 
   /* Project Card */

@@ -8,12 +8,12 @@ import Joi from 'joi';
 // Validation schemas
 const createProjectSchema = Joi.object({
   name: Joi.string().required().min(1).max(100),
-  description: Joi.string().optional().min(1).max(500)
+  description: Joi.string().allow('').optional().max(500)
 });
 
 const updateProjectSchema = Joi.object({
   name: Joi.string().min(1).max(100),
-  description: Joi.string().min(1).max(500)
+  description: Joi.string().allow('').max(500)
 });
 
 // Get all projects for the authenticated user

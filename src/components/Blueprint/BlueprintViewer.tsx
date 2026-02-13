@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { ZoomIn, ZoomOut, RotateCcw, Move, Brain, Clock, CheckCircle, XCircle, AlertCircle, Eye, EyeOff, Plus, Trash2, Pencil, MehIcon } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Move, Brain, Clock, CheckCircle, XCircle, AlertCircle, Eye, EyeOff, Plus, Trash2, Pencil, MehIcon, Save, Undo2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Blueprint } from '@/types';
 import { EnhancedSymbolAnalysis } from '@/components/AI/EnhancedSymbolAnalysis';
 
@@ -9,20 +10,37 @@ interface BlueprintViewerProps {
   blueprint: Blueprint;
   showSymbols?: boolean;
   onSymbolsChange?: (symbols: Blueprint['symbols']) => void;
+  hasUnsavedChanges?: boolean;
+  onSaveChanges?: () => void;
+  isSavingChanges?: boolean;
 }
 
-export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange }: BlueprintViewerProps) {
+type ResizeHandle = 'nw' | 'ne' | 'sw' | 'se';
+type OverlayShape = 'rectangle' | 'rounded' | 'circle' | 'diamond' | 'pill';
+
+export function BlueprintViewer({
+  blueprint,
+  showSymbols = true,
+  onSymbolsChange,
+  hasUnsavedChanges = false,
+  onSaveChanges,
+  isSavingChanges = false,
+}: BlueprintViewerProps) {
+  const LOW_CONFIDENCE_THRESHOLD = 0.75;
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [draggingSymbolId, setDraggingSymbolId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [resizingSymbol, setResizingSymbol] = useState<{ id: string; handle: ResizeHandle } | null>(null);
   const [showSymbolOverlays, setShowSymbolOverlays] = useState(true);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0, offsetX: 0, offsetY: 0 });
   const [symbols, setSymbols] = useState(blueprint.symbols);
+  const [history, setHistory] = useState<Blueprint['symbols'][]>([]);
   const [isAddingSymbol, setIsAddingSymbol] = useState(false);
+  const [reviewLowConfidenceOnly, setReviewLowConfidenceOnly] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -42,10 +60,10 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
   };
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (draggingSymbolId || isAddingSymbol) return; // block pan while dragging a box or adding symbol
+    if (draggingSymbolId || resizingSymbol || isAddingSymbol) return; // block pan while dragging/resizing/adding symbol
     setIsDragging(true);
     setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
-  }, [pan, draggingSymbolId, isAddingSymbol]);
+  }, [pan, draggingSymbolId, resizingSymbol, isAddingSymbol]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (isDragging && !draggingSymbolId) {
@@ -59,6 +77,7 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
   const handleMouseUp = useCallback(() => {
     setIsDragging(false);
     setDraggingSymbolId(null);
+    setResizingSymbol(null);
   }, []);
 
   // Calculate displayed image dimensions and position
@@ -89,21 +108,28 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
     updateImageDimensions();
   }, [updateImageDimensions]);
 
-  // Helper function to convert percentage coordinates to pixels based on displayed image size
+  // AI coordinates use center-point percentages, so convert center-based percentages to pixel box + center.
   const convertPercentageToPixels = useCallback((percentageCoords: { x: number; y: number; width: number; height: number }) => {
     if (!imageRef.current) {
       console.warn('🚫 Image ref not available for coordinate conversion');
-      return { x: 0, y: 0, width: 0, height: 0 };
+      return { left: 0, top: 0, centerX: 0, centerY: 0, width: 0, height: 0 };
     }
 
     const displayedWidth = imageRef.current.clientWidth;
     const displayedHeight = imageRef.current.clientHeight;
 
+    const width = (percentageCoords.width / 100) * displayedWidth;
+    const height = (percentageCoords.height / 100) * displayedHeight;
+    const centerX = (percentageCoords.x / 100) * displayedWidth;
+    const centerY = (percentageCoords.y / 100) * displayedHeight;
+
     const pixelCoords = {
-      x: (percentageCoords.x / 100) * displayedWidth,
-      y: (percentageCoords.y / 100) * displayedHeight,
-      width: (percentageCoords.width / 100) * displayedWidth,
-      height: (percentageCoords.height / 100) * displayedHeight
+      left: centerX - width / 2,
+      top: centerY - height / 2,
+      centerX,
+      centerY,
+      width,
+      height
     };
 
     console.log(`📐 Converting coordinates for symbol:`, {
@@ -128,25 +154,109 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
     setSymbols(blueprint.symbols);
   }, [blueprint.symbols]);
 
-  // Global mouse move handler for smooth symbol dragging
+  // Reset undo history only when switching to a different blueprint
   useEffect(() => {
-    if (!draggingSymbolId) return;
+    setHistory([]);
+  }, [blueprint.id]);
+
+  const cloneSymbols = useCallback((items: Blueprint['symbols']) =>
+    items.map((symbol) => ({
+      ...symbol,
+      position: { ...symbol.position },
+    })), []);
+
+  const applySymbolsUpdate = useCallback((updater: (prev: Blueprint['symbols']) => Blueprint['symbols']) => {
+    setSymbols((prev) => {
+      const previousSnapshot = cloneSymbols(prev);
+      const updated = updater(prev);
+      setHistory((prevHistory) => [...prevHistory, previousSnapshot]);
+      onSymbolsChange?.(updated);
+      return updated;
+    });
+  }, [cloneSymbols, onSymbolsChange]);
+
+  const handleUndo = useCallback(() => {
+    setHistory((prevHistory) => {
+      if (prevHistory.length === 0) return prevHistory;
+
+      const lastState = prevHistory[prevHistory.length - 1];
+      const restored = cloneSymbols(lastState);
+      setSymbols(restored);
+      onSymbolsChange?.(restored);
+
+      return prevHistory.slice(0, -1);
+    });
+  }, [cloneSymbols, onSymbolsChange]);
+
+  // Global mouse move handler for smooth symbol dragging/resizing
+  useEffect(() => {
+    if (!draggingSymbolId && !resizingSymbol) return;
+    const MIN_SIZE_PERCENT = 1;
 
     const handleGlobalMouseMove = (e: MouseEvent) => {
       const pct = convertPixelsToPercentage({ x: e.clientX, y: e.clientY });
       setSymbols(prev => {
         const updated = prev.map(s => {
-          if (s.id !== draggingSymbolId) return s;
-          const newX = Math.min(100 - s.position.width, Math.max(0, pct.x - dragOffset.x));
-          const newY = Math.min(100 - s.position.height, Math.max(0, pct.y - dragOffset.y));
-          return {
-            ...s,
-            position: {
-              ...s.position,
-              x: newX,
-              y: newY,
+          if (draggingSymbolId && s.id === draggingSymbolId) {
+            const halfWidth = s.position.width / 2;
+            const halfHeight = s.position.height / 2;
+            const newX = Math.min(100 - halfWidth, Math.max(halfWidth, pct.x - dragOffset.x));
+            const newY = Math.min(100 - halfHeight, Math.max(halfHeight, pct.y - dragOffset.y));
+            return {
+              ...s,
+              position: {
+                ...s.position,
+                x: newX,
+                y: newY,
+              }
+            };
+          }
+
+          if (resizingSymbol && s.id === resizingSymbol.id) {
+            let left = s.position.x - s.position.width / 2;
+            let right = s.position.x + s.position.width / 2;
+            let top = s.position.y - s.position.height / 2;
+            let bottom = s.position.y + s.position.height / 2;
+            const pointerX = Math.max(0, Math.min(100, pct.x));
+            const pointerY = Math.max(0, Math.min(100, pct.y));
+
+            switch (resizingSymbol.handle) {
+              case 'nw':
+                left = Math.min(right - MIN_SIZE_PERCENT, pointerX);
+                top = Math.min(bottom - MIN_SIZE_PERCENT, pointerY);
+                break;
+              case 'ne':
+                right = Math.max(left + MIN_SIZE_PERCENT, pointerX);
+                top = Math.min(bottom - MIN_SIZE_PERCENT, pointerY);
+                break;
+              case 'sw':
+                left = Math.min(right - MIN_SIZE_PERCENT, pointerX);
+                bottom = Math.max(top + MIN_SIZE_PERCENT, pointerY);
+                break;
+              case 'se':
+                right = Math.max(left + MIN_SIZE_PERCENT, pointerX);
+                bottom = Math.max(top + MIN_SIZE_PERCENT, pointerY);
+                break;
             }
-          };
+
+            left = Math.max(0, left);
+            right = Math.min(100, right);
+            top = Math.max(0, top);
+            bottom = Math.min(100, bottom);
+
+            return {
+              ...s,
+              position: {
+                ...s.position,
+                x: (left + right) / 2,
+                y: (top + bottom) / 2,
+                width: Math.max(MIN_SIZE_PERCENT, right - left),
+                height: Math.max(MIN_SIZE_PERCENT, bottom - top),
+              }
+            };
+          }
+
+          return s;
         });
         onSymbolsChange?.(updated);
         return updated;
@@ -155,6 +265,7 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
 
     const handleGlobalMouseUp = () => {
       setDraggingSymbolId(null);
+      setResizingSymbol(null);
     };
 
     document.addEventListener('mousemove', handleGlobalMouseMove);
@@ -164,7 +275,21 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
       document.removeEventListener('mousemove', handleGlobalMouseMove);
       document.removeEventListener('mouseup', handleGlobalMouseUp);
     };
-  }, [draggingSymbolId, dragOffset, convertPixelsToPercentage, onSymbolsChange]);
+  }, [draggingSymbolId, dragOffset, resizingSymbol, convertPixelsToPercentage, onSymbolsChange]);
+
+  // ESC cancels add-symbol mode.
+  useEffect(() => {
+    if (!isAddingSymbol) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsAddingSymbol(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isAddingSymbol]);
 
   // Update dimensions on window resize
   useEffect(() => {
@@ -222,29 +347,32 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
       category,
       type: category,
       position: {
-        x: Math.max(0, Math.min(100 - avgWidth, pct.x - avgWidth / 2)),
-        y: Math.max(0, Math.min(100 - avgHeight, pct.y - avgHeight / 2)),
+        x: Math.max(avgWidth / 2, Math.min(100 - avgWidth / 2, pct.x)),
+        y: Math.max(avgHeight / 2, Math.min(100 - avgHeight / 2, pct.y)),
         width: avgWidth,
         height: avgHeight,
       },
       confidence: 1.0,
     };
 
-    setSymbols(prev => {
-      const updated = [...prev, newSymbol];
-      onSymbolsChange?.(updated);
-      return updated;
-    });
+    applySymbolsUpdate((prev) => [...prev, newSymbol]);
     setIsAddingSymbol(false);
-  }, [isAddingSymbol, convertPixelsToPercentage, onSymbolsChange, symbols]);
+  }, [isAddingSymbol, convertPixelsToPercentage, symbols, applySymbolsUpdate]);
 
   const handleDeleteSymbol = useCallback((symbolId: string) => {
-    setSymbols(prev => {
-      const updated = prev.filter(s => s.id !== symbolId);
-      onSymbolsChange?.(updated);
-      return updated;
-    });
-  }, [onSymbolsChange]);
+    applySymbolsUpdate((prev) => prev.filter(s => s.id !== symbolId));
+  }, [applySymbolsUpdate]);
+
+  const handleMarkSymbolReviewed = useCallback((symbolId: string) => {
+    applySymbolsUpdate((prev) => prev.map((s) => (
+      s.id === symbolId
+        ? {
+            ...s,
+            confidence: Math.max(s.confidence, 0.9),
+          }
+        : s
+    )));
+  }, [applySymbolsUpdate]);
 
   const handleRenameSymbol = useCallback((symbolId: string) => {
     const newName = prompt('Enter new symbol label (e.g., FCU-4, EF-3):');
@@ -253,18 +381,14 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
     const newPartName = prompt('Enter mechanical part name/description (e.g., Supply fan, Pump, Motor):');
 
     const categoryInput = prompt('Enter category (hydraulic/hvac, pneumatic, mechanical, electrical, other):');
-    setSymbols(prev => {
-      const updated = prev.map(s => s.id === symbolId ? {
+    applySymbolsUpdate((prev) => prev.map(s => s.id === symbolId ? {
         ...s,
         name: newName.trim(),
         description: newPartName ? newPartName.trim() : s.description,
         category: categoryInput ? normalizeCategory(categoryInput) : s.category,
         type: categoryInput ? normalizeCategory(categoryInput) : s.type,
-      } : s);
-      onSymbolsChange?.(updated);
-      return updated;
-    });
-  }, [onSymbolsChange]);
+      } : s));
+  }, [applySymbolsUpdate]);
 
   const getSymbolColor = (category: string) => {
     const colors = {
@@ -294,92 +418,170 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
     ...blueprint,
     symbols,
   };
+  const lowConfidenceSymbols = symbols.filter((s) => s.confidence < LOW_CONFIDENCE_THRESHOLD);
+  const visibleSymbols = reviewLowConfidenceOnly
+    ? symbols.filter((s) => s.confidence < LOW_CONFIDENCE_THRESHOLD)
+    : symbols;
 
   return (
     <div className="blueprint-viewer relative">
 
       {/* Floating Controls */}
-      <div className="absolute left-0 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-2 bg-white/80 rounded-lg shadow-lg p-2 border border-slate-200 ml-2">
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={handleZoomIn}
-          className="glass"
-        >
-          <ZoomIn className="w-4 h-4" />
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={handleZoomOut}
-          className="glass"
-        >
-          <ZoomOut className="w-4 h-4" />
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={handleReset}
-          className="glass"
-        >
-          <RotateCcw className="w-4 h-4" />
-        </Button>
-        {symbols.length > 0 && (
-          <Button
-            size="sm"
-            variant={showSymbolOverlays ? "default" : "secondary"}
-            onClick={() => setShowSymbolOverlays(!showSymbolOverlays)}
-            className="glass"
-            title={showSymbolOverlays ? "Hide symbol boxes" : "Show symbol boxes"}
-          >
-            {showSymbolOverlays ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-          </Button>
-        )}
-        <Button
-          size="sm"
-          variant={isAddingSymbol ? "default" : "secondary"}
-          onClick={() => setIsAddingSymbol(!isAddingSymbol)}
-          className="glass"
-          title={isAddingSymbol ? "Cancel adding symbol" : "Add missing symbol"}
-        >
-          <Plus className="w-4 h-4" />
-        </Button>
-      </div>
+      <TooltipProvider delayDuration={0}>
+        <div className="absolute z-20 flex flex-col gap-2 left-1/2 -translate-x-1/2 bottom-3 md:bottom-auto md:left-0 md:top-1/2 md:-translate-y-1/2 md:translate-x-0 md:ml-2">
+          <div className="inline-flex w-fit flex-col items-center gap-1 bg-white/80 rounded-lg shadow-lg p-1 border border-slate-200">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="secondary"
+                  onClick={handleZoomIn}
+                  className="glass h-9 w-9"
+                  title="Zoom in"
+                  aria-label="Zoom in"
+                >
+                  <ZoomIn className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Zoom in</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="secondary"
+                  onClick={handleZoomOut}
+                  className="glass h-9 w-9"
+                  title="Zoom out"
+                  aria-label="Zoom out"
+                >
+                  <ZoomOut className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Zoom out</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="secondary"
+                  onClick={handleReset}
+                  className="glass h-9 w-9"
+                  title="Back to default view"
+                  aria-label="Back to default view"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Recenter view</TooltipContent>
+            </Tooltip>
+          </div>
+          <div className="inline-flex w-fit flex-wrap justify-center gap-1 bg-white/80 rounded-lg shadow-lg p-1 border border-slate-200 md:flex-nowrap md:flex-col md:justify-start md:gap-1">
+            {symbols.length > 0 && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant={showSymbolOverlays ? "default" : "secondary"}
+                    onClick={() => setShowSymbolOverlays(!showSymbolOverlays)}
+                    className="glass h-9 w-9"
+                    title={showSymbolOverlays ? "Hide mechanical symbols" : "View mechanical symbols"}
+                    aria-label={showSymbolOverlays ? "Hide mechanical symbols" : "View mechanical symbols"}
+                  >
+                    {showSymbolOverlays ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  {showSymbolOverlays ? "Hide symbols" : "View symbols"}
+                </TooltipContent>
+              </Tooltip>
+            )}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant={isAddingSymbol ? "default" : "secondary"}
+                  onClick={() => setIsAddingSymbol(!isAddingSymbol)}
+                  className="glass h-9 w-9"
+                  title={isAddingSymbol ? "Cancel add symbol" : "Add symbol"}
+                  aria-label={isAddingSymbol ? "Cancel add symbol" : "Add symbol"}
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                {isAddingSymbol ? "Cancel add symbol" : "Add symbol"}
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="secondary"
+                  onClick={handleUndo}
+                  className="glass h-9 w-9"
+                  disabled={history.length === 0}
+                  title="Undo last symbol change"
+                  aria-label="Undo last symbol change"
+                >
+                  <Undo2 className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">Undo last change</TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
+      </TooltipProvider>
 
-      {/* Title (left) - AI Analysis Status (right) */}
-      <div className="flex justify-between items-center p-6 bg-white border-b border-slate-200">
-        <div className="text-xl font-semibold text-foreground truncate max-w-[40vw]" title={blueprint.name}>{blueprint.name}</div>
-        <div className="flex items-center gap-2">
-          <Brain className="w-4 h-4" />
-          {getStatusIcon(blueprint.status)}
-          <span className="text-sm font-medium">
-            {blueprint.aiAnalysis?.isAnalyzed ? 'AI Analyzed' : 'Processing...'}
-          </span>
-          {blueprint.aiAnalysis?.confidence > 0 && (
-            <Badge variant="secondary" className="text-xs">
-              {blueprint.aiAnalysis.confidence}% confidence
-            </Badge>
-          )}
-          <div className="glass px-3 py-1 text-sm font-mono">
-            {Math.round(zoom * 100)}%
+      {/* AI Analysis Status (right) */}
+      <div className="flex justify-end items-center p-3 md:p-6 bg-white border-b border-slate-200">
+        <div className="flex flex-col items-end gap-1">
+          <div className="flex items-center gap-2">
+            <Brain className="w-4 h-4" />
+            {getStatusIcon(blueprint.status)}
+            <span className="text-xs sm:text-sm font-medium">
+              {blueprint.aiAnalysis?.isAnalyzed ? 'AI Analyzed' : 'Processing...'}
+            </span>
           </div>
         </div>
       </div>
       {/* Viewer Container */}
       <div
         ref={containerRef}
-        className={`w-full h-[700px] overflow-hidden bg-slate-50 relative ${isAddingSymbol ? 'cursor-crosshair' : 'cursor-move'
+        className={`w-full h-[85vh] min-h-[420px] overflow-hidden bg-slate-50 relative ${isAddingSymbol ? 'cursor-crosshair' : 'cursor-move'
           }`}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
+        {hasUnsavedChanges && (
+          <div className="absolute top-3 left-3 z-20 glass px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-medium text-amber-700 max-w-[55%] truncate">
+            Unsaved changes
+          </div>
+        )}
+        {reviewLowConfidenceOnly && (
+          <div className="absolute top-12 left-3 z-20 glass px-3 py-1 text-xs font-medium text-foreground">
+            Reviewing low confidence ({lowConfidenceSymbols.length})
+          </div>
+        )}
         {isAddingSymbol && (
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg pointer-events-none">
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 text-xs sm:text-sm font-medium text-blue-700 bg-blue-50/90 border border-blue-200 rounded-md px-3 py-1 backdrop-blur-sm">
             Click on the blueprint to place a symbol
           </div>
         )}
+        {hasUnsavedChanges && onSaveChanges && (
+          <div className="absolute top-3 right-3 z-20">
+            <Button onClick={onSaveChanges} disabled={isSavingChanges} size="sm" className="gap-2">
+              <Save className="w-4 h-4" />
+              <span className="hidden sm:inline">{isSavingChanges ? 'Saving...' : 'Save Changes'}</span>
+              <span className="sm:hidden">{isSavingChanges ? 'Saving' : 'Save'}</span>
+            </Button>
+          </div>
+        )}
+        <div className="absolute bottom-16 md:bottom-3 left-3 z-20 glass px-2 sm:px-3 py-1 text-xs sm:text-sm font-mono">
+          {Math.round(zoom * 100)}%
+        </div>
         <div className="flex justify-center items-center h-full w-full">
           <div
             ref={wrapperRef}
@@ -398,26 +600,37 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
               onLoad={handleImageLoad}
               onClick={handleImageClick}
               style={{
-                width: '800px',
+                width: 'auto',
                 height: 'auto', // Preserve aspect ratio
+                maxWidth: '85vw',
+                maxHeight: '85vh',
                 objectFit: 'contain' // Prevent stretching
               }}
             />
 
             {/* Symbol Overlays */}
-          {showSymbols && showSymbolOverlays && imageLoaded && symbols.map((symbol) => {
+          {showSymbols && showSymbolOverlays && imageLoaded && visibleSymbols.map((symbol) => {
             // Convert percentage coordinates to pixels based on actual displayed image size
             const pixelPosition = convertPercentageToPixels(symbol.position);
 
             const startDragSymbol = (e: React.MouseEvent) => {
               e.stopPropagation();
+              setHistory((prevHistory) => [...prevHistory, cloneSymbols(symbols)]);
               const pointer = { x: e.clientX, y: e.clientY };
               const pct = convertPixelsToPercentage(pointer);
               setDraggingSymbolId(symbol.id);
+              setResizingSymbol(null);
               setDragOffset({
                 x: pct.x - symbol.position.x,
-                y: pct.y - symbol.position.y,
-              });
+                  y: pct.y - symbol.position.y,
+                });
+              };
+
+            const startResizeSymbol = (e: React.MouseEvent, handle: ResizeHandle) => {
+              e.stopPropagation();
+              setHistory((prevHistory) => [...prevHistory, cloneSymbols(symbols)]);
+              setDraggingSymbolId(null);
+              setResizingSymbol({ id: symbol.id, handle });
             };
 
             console.log('🎯 Rendering symbol:', {
@@ -432,26 +645,68 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
             return (
               <div
                 key={symbol.id}
-                className={`absolute border-3 bg-opacity-25 rounded-md hover:bg-opacity-40 shadow-lg group ${draggingSymbolId === symbol.id ? 'cursor-grabbing scale-105' : 'cursor-grab hover:scale-102'
+                className={`absolute bg-opacity-25 rounded-md hover:bg-opacity-40 shadow-lg group ${draggingSymbolId === symbol.id ? 'cursor-grabbing scale-105' : 'cursor-grab hover:scale-102'
                   }`}
                 style={{
-                  left: `${pixelPosition.x}px`,
-                  top: `${pixelPosition.y}px`,
+                  left: `${pixelPosition.left}px`,
+                  top: `${pixelPosition.top}px`,
                   width: `${pixelPosition.width}px`,
                   height: `${pixelPosition.height}px`,
                   borderColor: getSymbolColor(symbol.category || 'other'),
                   backgroundColor: getSymbolColor(symbol.category || 'other') + '40',
-                  borderWidth: draggingSymbolId === symbol.id ? '4px' : '3px',
+                  borderWidth: draggingSymbolId === symbol.id ? '3px' : '2px',
                   borderStyle: 'solid',
-                  transition: draggingSymbolId === symbol.id ? 'none' : 'all 0.2s'
+                  transition: draggingSymbolId === symbol.id ? 'none' : 'all 0.2s',
                 }}
                 title={`${symbol.name}${symbol.description ? ': ' + symbol.description : ''} (${Math.round(symbol.confidence * 100)}% confidence) - Drag to reposition`}
                 onMouseDown={startDragSymbol}
               >
-                {/* Action Buttons (show on hover) */}
-                <div className="absolute -top-3 -right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+                {/* Center marker */}
+                <div
+                  className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/80 shadow-sm pointer-events-none"
+                  style={{
+                    left: '50%',
+                    top: '50%',
+                    width: '8px',
+                    height: '8px',
+                    backgroundColor: getSymbolColor(symbol.category || 'other'),
+                  }}
+                />
+                {/* Resize Handles */}
+                <button
+                  className="absolute -top-1 -left-1 w-2.5 h-2.5 rounded-[2px] bg-white border border-gray-500 cursor-nwse-resize opacity-0 group-hover:opacity-100 transition-opacity"
+                  onMouseDown={(e) => startResizeSymbol(e, 'nw')}
+                  title="Resize"
+                />
+                <button
+                  className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-[2px] bg-white border border-gray-500 cursor-nesw-resize opacity-0 group-hover:opacity-100 transition-opacity"
+                  onMouseDown={(e) => startResizeSymbol(e, 'ne')}
+                  title="Resize"
+                />
+                <button
+                  className="absolute -bottom-1 -left-1 w-2.5 h-2.5 rounded-[2px] bg-white border border-gray-500 cursor-nesw-resize opacity-0 group-hover:opacity-100 transition-opacity"
+                  onMouseDown={(e) => startResizeSymbol(e, 'sw')}
+                  title="Resize"
+                />
+                <button
+                  className="absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-[2px] bg-white border border-gray-500 cursor-nwse-resize opacity-0 group-hover:opacity-100 transition-opacity"
+                  onMouseDown={(e) => startResizeSymbol(e, 'se')}
+                  title="Resize"
+                />
+                {/* Name label: always above detection box */}
+                <div className="absolute left-1/2 -translate-x-1/2 -top-8 z-10 group/name">
+                  <div
+                    className="text-[10px] font-semibold px-2 py-1 rounded-md shadow-sm truncate backdrop-blur-sm border max-w-36"
+                    style={{
+                      color: getSymbolColor(symbol.category || 'other'),
+                      backgroundColor: 'rgba(255, 255, 255, 0.82)',
+                      borderColor: `${getSymbolColor(symbol.category || 'other')}66`,
+                    }}
+                  >
+                    {symbol.name}
+                  </div>
                   <button
-                    className="w-6 h-6 bg-white border border-gray-200 hover:border-blue-500 text-gray-700 hover:text-blue-600 rounded-full flex items-center justify-center shadow-sm"
+                    className="absolute top-1/2 -left-2 -translate-x-full -translate-y-1/2 w-6 h-6 bg-white border border-gray-200 hover:border-blue-500 text-gray-700 hover:text-blue-600 rounded-full flex items-center justify-center shadow-sm opacity-0 group-hover/name:opacity-100 transition-opacity duration-200"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleRenameSymbol(symbol.id);
@@ -460,47 +715,41 @@ export function BlueprintViewer({ blueprint, showSymbols = true, onSymbolsChange
                   >
                     <Pencil className="w-3 h-3" />
                   </button>
-                  <button
-                    className="w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteSymbol(symbol.id);
-                    }}
-                    title="Delete symbol"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
+                  <div className="absolute top-1/2 -right-2 translate-x-full -translate-y-1/2 flex gap-1 opacity-0 group-hover/name:opacity-100 transition-opacity duration-200">
+                    {symbol.confidence < LOW_CONFIDENCE_THRESHOLD && (
+                      <button
+                        className="w-6 h-6 bg-green-500 hover:bg-green-600 text-white rounded-full flex items-center justify-center shadow-md"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMarkSymbolReviewed(symbol.id);
+                        }}
+                        title="Mark reviewed"
+                      >
+                        <CheckCircle className="w-3 h-3" />
+                      </button>
+                    )}
+                    <button
+                      className="w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-md"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteSymbol(symbol.id);
+                      }}
+                      title="Delete symbol"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
-                {/* Confidence Badge */}
+                {/* Confidence label: always below detection box */}
                 <div
-                  className="absolute -top-6 left-0 text-xs font-bold text-white px-2 py-1 rounded-t-md shadow-sm"
+                  className="absolute left-1/2 -translate-x-1/2 top-full mt-1 text-[10px] font-semibold px-2 py-1 rounded-md shadow-sm w-fit backdrop-blur-sm border pointer-events-none"
                   style={{
-                    backgroundColor: getSymbolColor(symbol.category || 'other'),
-                    minWidth: 'fit-content'
+                    color: getSymbolColor(symbol.category || 'other'),
+                    backgroundColor: 'rgba(255, 255, 255, 0.82)',
+                    borderColor: `${getSymbolColor(symbol.category || 'other')}66`,
                   }}
                 >
                   {Math.round(symbol.confidence * 100)}%
-                </div>
-
-                {/* Symbol Name Label */}
-                <div
-                  className="absolute -bottom-6 left-0 text-xs font-medium text-gray-900 px-2 py-1 rounded-b-md shadow-sm max-w-32 truncate"
-                  style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    border: `1px solid ${getSymbolColor(symbol.category || 'other')}`
-                  }}
-                >
-                  {symbol.name}
-                </div>
-
-                {/* Center crosshair for precise positioning */}
-                <div
-                  className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                >
-                  <div
-                    className="w-3 h-3 rounded-full border-2 border-white shadow-sm"
-                    style={{ backgroundColor: getSymbolColor(symbol.category || 'other') }}
-                  />
                 </div>
               </div>
             );

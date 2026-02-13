@@ -81,6 +81,8 @@ const getTableConfidenceIcon = (confidence: number) => {
 export function EnhancedSymbolAnalysis({ blueprint }: EnhancedSymbolAnalysisProps) {
   // Capitalize first letter utility
   const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const displayCategory = (category: string) =>
+    category.toLowerCase() === 'hydraulic' ? 'HVAC' : capitalize(category);
   const { symbols, aiAnalysis } = blueprint;
 
   console.log('🔍 EnhancedSymbolAnalysis received:', {
@@ -126,6 +128,30 @@ export function EnhancedSymbolAnalysis({ blueprint }: EnhancedSymbolAnalysisProp
   const highConfidenceCount = aiDetected.filter(s => s.confidence >= 0.9).length;
   const mediumConfidenceCount = aiDetected.filter(s => s.confidence >= 0.75 && s.confidence < 0.9).length;
   const lowConfidenceCount = aiDetected.filter(s => s.confidence < 0.75).length;
+  const sourceSymbols = aiDetected.length > 0 ? aiDetected : symbols;
+  const inferredBlueprintType = (() => {
+    if (sourceSymbols.length === 0) return 'general mechanical blueprint';
+    const categoryCounts = sourceSymbols.reduce<Record<string, number>>((acc, symbol) => {
+      const key = (symbol.category || 'other').toLowerCase();
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+    const [dominantCategory, dominantCount] = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])[0];
+    const dominantRatio = dominantCount / sourceSymbols.length;
+
+    if (dominantRatio < 0.45) return 'mixed-discipline mechanical drawing';
+
+    const typeByCategory: Record<string, string> = {
+      hydraulic: 'hydraulic schematic',
+      pneumatic: 'pneumatic diagram',
+      electrical: 'electrical control schematic',
+      mechanical: 'mechanical layout drawing',
+      other: 'general mechanical blueprint',
+    };
+
+    return typeByCategory[dominantCategory] || 'general mechanical blueprint';
+  })();
+  const blueprintTypeSentence = `Overall, this appears to be a ${inferredBlueprintType}.`;
 
   return (
     <div className="space-y-6">
@@ -197,9 +223,10 @@ export function EnhancedSymbolAnalysis({ blueprint }: EnhancedSymbolAnalysisProp
               </div>
             </div>
             {aiAnalysis.summary && (
-              <div className="border rounded -lg bg-muted/30 p-4 rounded-lg">
+              <div className="border bg-muted/30 p-4 rounded-lg">
                 <h4 className="font-medium mb-2">Analysis Summary</h4>
                 <p className="text-sm text-muted-foreground">{aiAnalysis.summary}</p>
+                <p className="text-sm text-muted-foreground mt-2">{blueprintTypeSentence}</p>
               </div>
             )}
             {/* Visualization Section (now inside AI Analysis Summary) */}
@@ -256,7 +283,7 @@ export function EnhancedSymbolAnalysis({ blueprint }: EnhancedSymbolAnalysisProp
                       outerRadius={100}
                       paddingAngle={3}
                       dataKey="value"
-                      label={({ name, percent }) => `${capitalize(name)}: ${(percent * 100).toFixed(0)}%`}
+                      label={({ name, percent }) => `${displayCategory(String(name))}: ${(percent * 100).toFixed(0)}%`}
                       labelLine={false}
                     >
                       {Object.entries(symbolsByCategory).map(([category], index) => (
@@ -289,7 +316,7 @@ export function EnhancedSymbolAnalysis({ blueprint }: EnhancedSymbolAnalysisProp
                 {Object.entries(symbolsByCategory).map(([category]) => (
                   <div key={category} className="flex items-center gap-2">
                     <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: categoryColorsGraphs[category as keyof typeof categoryColorsGraphs] || '#6b7280' }}></span>
-                    <span className="capitalize text-xs text-muted-foreground">{category}</span>
+                    <span className="text-xs text-muted-foreground">{displayCategory(category)}</span>
                   </div>
                 ))}
               </div>
@@ -332,7 +359,7 @@ export function EnhancedSymbolAnalysis({ blueprint }: EnhancedSymbolAnalysisProp
                               <div className="flex items-center gap-2 text-sm">
                                 <span className="capitalize">Count:</span>
                                 <span className="font-medium">{payload[0].value}</span>
-                                <span className="capitalize ml-2" style={{ color: categoryColorsGraphs[category] || '#6b7280' }}>{category}</span>
+                                <span className="ml-2" style={{ color: categoryColorsGraphs[category] || '#6b7280' }}>{displayCategory(category)}</span>
                               </div>
                             </div>
                           );
@@ -401,7 +428,7 @@ export function EnhancedSymbolAnalysis({ blueprint }: EnhancedSymbolAnalysisProp
                                 className="w-3 h-3 rounded-full"
                                 style={{ backgroundColor: categoryColorsGraphs[category as keyof typeof categoryColorsGraphs] }}
                               />
-                              <span className="font-semibold text-gray-900 capitalize">{category}</span>
+                              <span className="font-semibold text-gray-900">{displayCategory(category)}</span>
                               <span className="text-sm text-gray-500">({items.length} parts)</span>
                             </div>
                           </td>

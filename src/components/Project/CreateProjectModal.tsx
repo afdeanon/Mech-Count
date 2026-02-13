@@ -31,12 +31,15 @@ export function CreateProjectModal({ isOpen, onClose }: CreateProjectModalProps)
     setIsLoading(true);
     
     try {
-      console.log('📁 Creating project:', { name: name.trim(), description: description.trim() });
+      const trimmedName = name.trim();
+      const trimmedDescription = description.trim();
+      const projectPayload = {
+        name: trimmedName,
+        ...(trimmedDescription ? { description: trimmedDescription } : {}),
+      };
+      console.log('📁 Creating project:', projectPayload);
       
-      const response = await createProject({
-        name: name.trim(),
-        description: description.trim()
-      });
+      const response = await createProject(projectPayload);
 
       if (response.success && response.data) {
         // Add to local state

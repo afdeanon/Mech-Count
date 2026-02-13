@@ -39,6 +39,8 @@ export function SaveToProjectModal({ isOpen, onClose, blueprint, originalFile, o
   const { state, dispatch } = useApp();
   const { toast } = useToast();
 
+  const getFileTitle = (filename: string) => filename.replace(/\.[^/.]+$/, '');
+
   // Update selected project when preSelectedProjectId changes
   useEffect(() => {
     if (preSelectedProjectId) {
@@ -46,6 +48,19 @@ export function SaveToProjectModal({ isOpen, onClose, blueprint, originalFile, o
       setShowNewProject(false); // Don't show new project form if we have a pre-selected project
     }
   }, [preSelectedProjectId]);
+
+  // Prefill save prompt fields when modal opens:
+  // Prefer the uploaded file title, then fallback to blueprint name.
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const preferredName = originalFile?.name
+      ? getFileTitle(originalFile.name)
+      : (blueprint?.name || '');
+
+    setBlueprintName(preferredName);
+    setBlueprintDescription(blueprint?.description || '');
+  }, [isOpen, blueprint?.name, blueprint?.description, originalFile]);
 
   const handleSave = async () => {
     if (!blueprint) return;

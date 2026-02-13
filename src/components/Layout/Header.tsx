@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Settings, FileText, LogOut } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { signOutUser } from '@/services/authService';
+import { getDefaultAvatar } from '@/lib/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 
@@ -13,6 +14,7 @@ interface HeaderProps {
 
 export function Header({ showAuthButtons, onLoginClick, onSignUpClick }: HeaderProps) {
   const { state, dispatch } = useApp();
+  const user = state.auth.user;
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -82,12 +84,16 @@ export function Header({ showAuthButtons, onLoginClick, onSignUpClick }: HeaderP
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
                   <img 
-                    src={state.auth.user?.avatar} 
-                    alt={state.auth.user?.name}
+                    src={user?.avatar || getDefaultAvatar(user?.name, user?.email)}
+                    alt={user?.name || 'User avatar'}
+                    onError={(event) => {
+                      event.currentTarget.onerror = null;
+                      event.currentTarget.src = getDefaultAvatar(user?.name, user?.email);
+                    }}
                     className="w-8 h-8 rounded-full"
                   />
                   <span className="hidden md:block text-sm font-medium">
-                    {state.auth.user?.name}
+                    {user?.name}
                   </span>
                 </div>
                 <Button 

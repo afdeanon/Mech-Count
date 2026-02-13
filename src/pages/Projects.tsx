@@ -3,14 +3,31 @@ import { Link } from 'react-router-dom';
 import { Sidebar } from '@/components/Layout/Sidebar';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { CreateProjectModal } from '@/components/Project/CreateProjectModal';
 import { useApp } from '@/context/AppContext';
-import { Plus, FolderOpen, Calendar, FileImage, MoreVertical } from 'lucide-react';
-import { format } from 'date-fns';
+import { Plus, FolderOpen, FileImage, MoreVertical } from 'lucide-react';
+import { format, formatDistanceToNowStrict } from 'date-fns';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { deleteProject } from '@/services/projectService';
 import { useToast } from '@/hooks/use-toast';
+
+const formatUpdatedLabel = (dateValue: string | number | Date | undefined | null) => {
+  try {
+    const date = new Date(dateValue || '');
+    if (Number.isNaN(date.getTime())) return 'Updated recently';
+
+    const ageMs = Date.now() - date.getTime();
+    const oneDayMs = 24 * 60 * 60 * 1000;
+
+    if (ageMs < oneDayMs) {
+      return `Updated ${formatDistanceToNowStrict(date, { addSuffix: true })}`;
+    }
+
+    return `Updated on ${format(date, 'MMMM d')}`;
+  } catch {
+    return 'Updated recently';
+  }
+};
 
 export function Projects() {
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -67,7 +84,7 @@ export function Projects() {
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
-      <main className="ml-64 p-6">
+      <main className="ml-56 p-5">
           <div className="max-w-6xl mx-auto space-y-8">
             <div className="flex items-center justify-between">
               <div>
@@ -84,7 +101,7 @@ export function Projects() {
                 className="btn-tech gap-2"
               >
                 <Plus className="w-4 h-4" />
-                Add Project
+                New Project
               </Button>
             </div>
 
@@ -111,44 +128,39 @@ export function Projects() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {state.projects.map((project) => {
                   // Calculate blueprint count from state instead of project.blueprints
-                  const blueprintCount = state.blueprints.filter(bp => bp.projectId === project.id).length;
+                  const projectBlueprints = state.blueprints.filter(bp => bp.projectId === project.id);
+                  const blueprintCount = projectBlueprints.length;
+                  const latestBlueprintUpload = projectBlueprints
+                    .map((bp) => new Date(bp.uploadDate).getTime())
+                    .filter((time) => !Number.isNaN(time))
+                    .sort((a, b) => b - a)[0];
+                  const updatedDate = latestBlueprintUpload
+                    ? new Date(latestBlueprintUpload)
+                    : project.createdAt;
                   
                   return (
                     <div key={project.id} className="relative">
                       <Link to={`/projects/${project.id}`} className="block">
                         <Card className="project-card h-full">
-                          <CardContent className="p-6">
+                          <CardContent className="p-6 min-h-[230px] flex flex-col">
                             <div className="flex items-start justify-between mb-4">
                               <div className="flex-1 min-w-0">
                                 <h3 className="text-lg font-semibold text-foreground mb-2 truncate">
                                   {project.name}
                                 </h3>
-                                <p className="text-muted-foreground text-sm line-clamp-2 mb-4">
-                                  {project.description}
+                                <p className="text-muted-foreground text-sm line-clamp-3 min-h-[60px]">
+                                  {project.description || 'No description'}
                                 </p>
                               </div>
                             </div>
 
-                            <div className="space-y-3">
-                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <Calendar className="w-4 h-4" />
-                                <span>Created {format(new Date(project.createdAt), 'MMM d, yyyy')}</span>
+                            <div className="mt-auto pt-4 border-t border-border min-w-0">
+                              <div className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground whitespace-nowrap overflow-hidden">
+                                <FileImage className="w-3.5 h-3.5" />
+                                <span>{blueprintCount} blueprint{blueprintCount !== 1 ? 's' : ''}</span>
+                                <span aria-hidden="true">•</span>
+                                <span className="truncate">{formatUpdatedLabel(updatedDate)}</span>
                               </div>
-                              
-                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <FileImage className="w-4 h-4" />
-                                <span>
-                                  {blueprintCount} blueprint{blueprintCount !== 1 ? 's' : ''}
-                                </span>
-                              </div>
-                            </div>
-
-                            <div className="mt-4 pt-4 border-t border-border">
-                              <Badge variant="outline" className="text-xs">
-                                {blueprintCount === 0 ? 'Empty' : 
-                                 blueprintCount === 1 ? '1 Blueprint' :
-                                 `${blueprintCount} Blueprints`}
-                              </Badge>
                             </div>
                           </CardContent>
                         </Card>

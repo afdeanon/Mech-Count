@@ -51,26 +51,63 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 function mapCategoryToExpectedFormat(category: string): 'hydraulic' | 'pneumatic' | 'mechanical' | 'electrical' | 'other' {
   if (!category) return 'other';
 
-  const lowerCategory = category.toLowerCase();
+  const lowerCategory = category.toLowerCase().trim();
 
-  // Map common HVAC/plumbing terms to appropriate categories
-  if (lowerCategory.includes('hvac') || lowerCategory.includes('plumbing')) {
-    return 'hydraulic'; // Most HVAC/plumbing systems use hydraulics
-  }
-
-  // Direct mappings
   const categoryMap: { [key: string]: 'hydraulic' | 'pneumatic' | 'mechanical' | 'electrical' | 'other' } = {
-    'hydraulic': 'hydraulic',
-    'pneumatic': 'pneumatic',
-    'mechanical': 'mechanical',
-    'electrical': 'electrical',
-    'hvac': 'hydraulic',
-    'plumbing': 'hydraulic',
-    'structural': 'mechanical'
+    hydraulic: 'hydraulic',
+    plumbing: 'hydraulic',
+    valve: 'hydraulic',
+    pump: 'hydraulic',
+    water: 'hydraulic',
+    pneumatic: 'pneumatic',
+    compressed_air: 'pneumatic',
+    mechanical: 'mechanical',
+    hvac: 'mechanical',
+    ventilation: 'mechanical',
+    fan: 'mechanical',
+    structural: 'mechanical',
+    controls: 'electrical',
+    control: 'electrical',
+    electrical: 'electrical',
+    electric: 'electrical',
+    vfd: 'electrical',
+    motor: 'electrical',
+    other: 'other',
+    unknown: 'other'
   };
 
-  return categoryMap[lowerCategory] || 'other';
+  if (categoryMap[lowerCategory]) {
+    return categoryMap[lowerCategory];
+  }
+
+  if (lowerCategory.includes('hvac') || lowerCategory.includes('vent') || lowerCategory.includes('fan')) {
+    return 'mechanical';
+  }
+  if (lowerCategory.includes('plumb') || lowerCategory.includes('hydra') || lowerCategory.includes('pump') || lowerCategory.includes('valve')) {
+    return 'hydraulic';
+  }
+  if (lowerCategory.includes('elect') || lowerCategory.includes('control') || lowerCategory.includes('motor')) {
+    return 'electrical';
+  }
+
+  return 'other';
 }
+
+const normalizeSymbolConfidence = (rawConfidence: unknown): number => {
+  const numeric = Number(rawConfidence);
+  if (!Number.isFinite(numeric) || numeric <= 0) return 0;
+
+  const decimal = numeric > 1 ? numeric / 100 : numeric;
+  return Math.max(0, Math.min(1, decimal));
+};
+
+const normalizeOverallConfidence = (rawConfidence: unknown): number => {
+  const numeric = Number(rawConfidence);
+  if (!Number.isFinite(numeric) || numeric <= 0) return 0;
+
+  const percent = numeric <= 1 ? numeric * 100 : numeric;
+  return Math.max(0, Math.min(100, percent));
+};
 
 /**
  * Analyze a blueprint image using OpenAI Vision API to detect mechanical symbols
@@ -218,342 +255,60 @@ export const analyzeBlueprint = async (
         return clampBox(box);
       }
     };
-const prompt = `You are analyzing a mechanical/HVAC blueprint floor plan to find ALL labeled mechanical components and return their precise coordinates.
-
-🎯 PRIMARY GOAL: Find EVERY labeled mechanical component in this blueprint. Scan systematically and completely.
-
-═══════════════════════════════════════════════════════════════════
-
-SCANNING STRATEGY
-
-Use a 3x3 grid approach - scan each section thoroughly:
-
-    [Top-Left]      [Top-Center]      [Top-Right]
-    [Middle-Left]   [Middle-Center]   [Middle-Right]  
-    [Bottom-Left]   [Bottom-Center]   [Bottom-Right]
-
-For each section:
-1. Scan along the walls/perimeter first (most equipment is wall-mounted)
-2. Then scan interior spaces
-3. Look for both labels and leader lines
-4. Check corners carefully
-5. Use spatial context: nearby ductwork, plumbing lines, and room types (bathrooms, mechanical rooms) to identify likely equipment locations
-
-═══════════════════════════════════════════════════════════════════
-
-WHAT TO LOOK FOR
-
-Common Equipment Labels on Residential/Commercial Floor Plans:
-
-AIR HANDLING:
-- FCU-1, FCU-2, FCU-3 (Fan Coil Units) - wall-mounted HVAC units
-- AHU-1, AHU-2 (Air Handling Units)
-- ERV-1, HRV-1 (Energy/Heat Recovery Ventilators)
-
-VENTILATION:
-- EF-1, EF-2 (Exhaust Fans) - typically in bathrooms/kitchens
-- SF-1, SF-2 (Supply Fans) 
-- RF-1 (Return Fan)
-- Inline fans, bathroom fans, kitchen exhaust
-
-CONTROLS & ELECTRICAL:
-- EC-1, EC-2 (Electrical Controls or Equipment Controls)
-- T-1, STAT-1 (Thermostats)
-- VFD-1 (Variable Frequency Drive)
-
-OTHER MECHANICAL:
-- P-1, PUMP-1 (Pumps)
-- V-1, VALVE-1 (Valves)
-- Dryer booster fans, makeup air units
-
-ANNOTATED TEXT (Informational, not components):
-- "RUN IN TWO LINED JOIST BAYS"
-- "DRYER BOOSTER FAN" (if pointing to a specific symbol, include it)
-- "BATH", "KITCHEN" (room labels - skip these)
-
-═══════════════════════════════════════════════════════════════════
-
-LABEL PATTERNS & FORMATS
-
-Equipment Tag Formats:
-- [LETTERS]-[NUMBER]: FCU-1, EF-2, EC-3, SF-1
-- [LETTERS][NUMBER]: FCU1, EF2
-- Just letters: FCU, EF, SF (treat as component if it points to a symbol)
-
-Location of Labels:
-- Often OUTSIDE the floor plan boundary with leader lines pointing IN
-- Sometimes directly adjacent to symbol (no leader line)
-- Occasionally inside the symbol itself
-- May be rotated/angled to fit space
-
-═══════════════════════════════════════════════════════════════════
-
-SYMBOL IDENTIFICATION
-
-WHERE symbols typically appear:
-- **At exterior walls**: FCU units, through-wall equipment
-- **In bathrooms**: EF (exhaust fans) - small circles or squares on ceiling
-- **In mechanical spaces**: larger equipment
-- **Along ductwork runs**: inline fans, dampers
-
-WHAT symbols look like:
-- **FCU (Fan Coil Unit)**: Small rectangle or square, often at exterior wall, may show internal fan symbol
-- **EF (Exhaust Fan)**: Small circle or square, usually ceiling-mounted (shown with circle symbol)
-- **SF (Supply Fan)**: Similar to EF, may have directional arrow
-- **EC (Electrical Control)**: Small rectangle or square symbol
-- **Pumps**: Circle with "P" or curved impeller lines
-- **Thermostats**: Small rectangle on wall
-
-Symbol sizes on these plans:
-- Very small (1-3%): thermostats, small fans, controls
-- Small (2-5%): exhaust fans, FCUs, valves
-- Medium (4-8%): larger equipment, grouped items
-
-═══════════════════════════════════════════════════════════════════
-
-TRACING LABELS TO SYMBOLS
-
-LEADER LINE SCENARIOS:
-
-1. **Label outside floor plan → Leader line points to wall-mounted equipment**
-   - Follow the line (may be straight, angled, or curved)
-   - Symbol is usually at the endpoint or very near it
-   - Common for FCU, EF labels
-
-2. **Label adjacent to symbol (no leader line)**
-   - Symbol is within 1-2% distance of label
-   - Usually directly beside, above, or below the label
-
-3. **Label with arrow/callout**
-   - Follow arrow to exact component
-   - May cross multiple elements - trace carefully
-
-4. **Multiple instances of same label** (e.g., two "FCU-1" labels)
-   - Each label points to a separate physical unit
-   - Create separate entries with different coordinates
-
-═══════════════════════════════════════════════════════════════════
-
-COORDINATE PLACEMENT RULES
-
-⚠️ CRITICAL: Box the SYMBOL (the graphical equipment icon), NOT the text label!
-
-RESOLUTION INDEPENDENCE:
-- Images will have varying pixel dimensions (different widths and heights)
-- ALWAYS express coordinates as PERCENTAGES (0-100) of total image dimensions
-- DO NOT calculate or use absolute pixel values
-- A symbol at 25% from the left edge = x: 25.0 (whether image is 500px or 5000px wide)
-
-Coordinate System:
-- Origin (0,0) = top-left corner
-- X-axis: 0 (left edge) → 100 (right edge)
-- Y-axis: 0 (top edge) → 100 (bottom edge)
-- All values are percentages (0-100)
-
-BOUNDING BOX SHAPE:
-All bounding boxes must be:
-- **Axis-aligned rectangles** (edges parallel to image edges, no rotation)
-- **Tightly fitted** to the symbol with minimal padding
-- **Excluding** the text label (unless label is inside the symbol)
-- **Excluding** leader lines
-
-For different symbol shapes:
-- Circular symbols (fans, pumps): smallest square that fully contains the circle
-- Rectangular symbols (FCUs, AHUs): match the rectangle's dimensions
-- Irregular shapes: smallest rectangle containing the entire symbol
-
-═══════════════════════════════════════════════════════════════════
-
-COORDINATE CALCULATION METHOD
-
-Follow this process for EACH symbol to ensure accuracy:
-
-STEP 1 - Identify Symbol Boundaries (as percentages of image):
-- Locate the leftmost edge of the symbol → x_left (e.g., 20%)
-- Locate the rightmost edge of the symbol → x_right (e.g., 26%)
-- Locate the topmost edge of the symbol → y_top (e.g., 15%)
-- Locate the bottommost edge of the symbol → y_bottom (e.g., 20%)
-
-STEP 2 - Calculate Center Point:
-- x = (x_left + x_right) / 2
-  Example: (20 + 26) / 2 = 23.0
-- y = (y_top + y_bottom) / 2
-  Example: (15 + 20) / 2 = 17.5
-
-STEP 3 - Calculate Dimensions:
-- width = x_right - x_left
-  Example: 26 - 20 = 6.0
-- height = y_bottom - y_top
-  Example: 20 - 15 = 5.0
-
-STEP 4 - Use Mental Grid for Calibration:
-Imagine a 10×10 grid overlay (each cell = 10% × 10%):
-
-     0   10   20   30   40   50   60   70   80   90  100
-  0  ┌────┬────┬────┬────┬────┬────┬────┬────┬────┬────┐
- 10  ├────┼────┼────┼────┼────┼────┼────┼────┼────┼────┤
- 20  ├────┼────┼────┼────┼────┼────┼────┼────┼────┼────┤
- 30  ├────┼────┼────┼────┼────┼────┼────┼────┼────┼────┤
- 40  ├────┼────┼────┼────┼────┼────┼────┼────┼────┼────┤
- 50  ├────┼────┼────┼────┼────┼────┼────┼────┼────┼────┤
- 60  ├────┼────┼────┼────┼────┼────┼────┼────┼────┼────┤
- 70  ├────┼────┼────┼────┼────┼────┼────┼────┼────┼────┤
- 80  ├────┼────┼────┼────┼────┼────┼────┼────┼────┼────┤
- 90  ├────┼────┼────┼────┼────┼────┼────┼────┼────┼────┤
-100  └────┴────┴────┴────┴────┴────┴────┴────┴────┴────┘
-
-- Symbol in grid cell (2,1) → approximately x=25, y=15
-- Symbol spanning cells (7-8, 4-5) → approximately x=75, y=45, width=10, height=10
-
-STEP 5 - Verify Using Multiple Methods:
-
-Method 1 - Quadrant Check:
-□ Symbol in top-left quadrant? → x should be 0-50 AND y should be 0-50
-□ Symbol in top-right quadrant? → x should be 50-100 AND y should be 0-50
-□ Symbol in bottom-left quadrant? → x should be 0-50 AND y should be 50-100
-□ Symbol in bottom-right quadrant? → x should be 50-100 AND y should be 50-100
-
-Method 2 - Edge Distance Check:
-□ If symbol appears 20% from left edge → x should be ≈ 20
-□ If symbol appears 15% from right edge → x should be ≈ 85 (100 - 15)
-□ If symbol appears 10% from top edge → y should be ≈ 10
-□ If symbol appears 25% from bottom edge → y should be ≈ 75 (100 - 25)
-
-Method 3 - Size Sanity Check:
-□ Small symbols (fans, valves): width and height typically 2-5%
-□ Medium symbols (FCUs, pumps): width and height typically 4-8%
-□ Large symbols (AHUs): width and height typically 8-15%
-□ If calculated width or height > 20% → likely ERROR, remeasure
-
-PRECISION REQUIREMENTS:
-- Use ONE decimal place (e.g., 45.5, not 45.532 or 45)
-- Round to nearest 0.5 (e.g., 23.7 → 23.5, 67.3 → 67.5, 89.8 → 90.0)
-- Center coordinates (x, y): ±2% accuracy is acceptable
-- Dimensions (width, height): ±1% accuracy is acceptable
-
-═══════════════════════════════════════════════════════════════════
-
-COMMON COORDINATE ERRORS TO AVOID
-
-❌ ERROR 1: Measuring from Label Instead of Symbol
-- Label outside plan at y=5, symbol inside at y=30
-- Wrong: {y: 5.0} ✗
-- Right: {y: 30.0} ✓
-
-❌ ERROR 2: Including Label Text in Width/Height
-- Symbol is 3% wide, label text adds 5% more width
-- Wrong: {width: 8.0} ✗
-- Right: {width: 3.0} ✓
-
-❌ ERROR 3: Quadrant Mismatch
-- Symbol clearly in bottom-right but coordinates show top-left
-- Wrong: {x: 25.0, y: 20.0} ✗
-- Right: {x: 75.0, y: 70.0} ✓
-
-❌ ERROR 4: Unrealistic Dimensions
-- Small exhaust fan with huge bounding box
-- Wrong: {width: 25.0, height: 30.0} ✗
-- Right: {width: 3.0, height: 3.0} ✓
-
-═══════════════════════════════════════════════════════════════════
-
-VALIDATION CHECKS
-
-Before finalizing coordinates, verify:
-- Symbol on LEFT half → x should be 0-50 ✓
-- Symbol on RIGHT half → x should be 50-100 ✓
-- Symbol in TOP half → y should be 0-50 ✓
-- Symbol in BOTTOM half → y should be 50-100 ✓
-
-Expected Symbol Sizes:
-- Tiny (1-3%): small controls, sensors
-- Small (2-5%): most fans, FCUs, thermostats
-- Medium (4-8%): larger equipment
-- ⚠️ If width or height > 15%, recheck your measurement
-
-═══════════════════════════════════════════════════════════════════
-
-EDGE CASES
-
-- **Duplicate equipment labels**: If you see "FCU-1" twice, there are 2 separate FCU-1 units - create 2 entries
-- **Unclear/illegible label**: Use name "?" with description of symbol
-- **Descriptive text without symbol**: "DRYER BOOSTER FAN" text only → skip unless there's a symbol
-- **Descriptive text WITH symbol**: "DRYER BOOSTER FAN" + fan symbol → include it with that name
-- **Very faint symbols**: Include only if clearly intentional (not background grid lines)
-- **Grouped equipment**: Label points to multiple items → try to identify each separately
-
-═══════════════════════════════════════════════════════════════════
-
-CONFIDENCE LEVELS
-
-95-100: Label clear, symbol obvious, position certain
-85-94:  Label and symbol both clear, minor position uncertainty  
-70-84:  Partial obscurity or position estimation required
-50-69:  Significant uncertainty
-<50:    Skip - too uncertain to include
-
-═══════════════════════════════════════════════════════════════════
-
-CATEGORIES
-
-- **hvac**: FCU, AHU, ERV, HRV, fans, air handlers, diffusers, grilles, ductwork equipment
-- **ventilation**: EF, SF, RF, exhaust/supply/return fans, bathroom fans, kitchen hoods
-- **plumbing**: pumps, valves, water heaters, drains
-- **electrical**: EC, motors, panels, VFDs
-- **controls**: thermostats, sensors, actuators, controllers
-- **other**: unclear or doesn't fit above
-
-═══════════════════════════════════════════════════════════════════
-
-PRE-SUBMISSION CHECKLIST
-
-□ Scanned all 9 grid sections?
-□ Checked perimeter walls thoroughly (where most equipment is)?
-□ Counted visible labels - does output match?
-□ Verified boxes are on SYMBOLS not LABELS?
-□ Checked that bottom-half components have y > 50?
-□ Checked that right-half components have x > 50?
-□ Included duplicate equipment instances separately?
-□ Examined corners and edges?
-□ Reasonable symbol sizes (mostly 1-8%)?
-□ Used mental 10×10 grid to verify coordinate positions?
-□ Coordinates expressed as percentages (0-100), not pixels?
-
-═══════════════════════════════════════════════════════════════════
-
-OUTPUT FORMAT
-
-Return ONLY valid JSON with NO markdown backticks:
-
+const prompt = `You are a senior MEP plan reviewer. Detect labeled mechanical/HVAC components in this blueprint image.
+
+Requirements:
+- Return ONLY strict JSON (no markdown, no commentary).
+- Find symbols, not room text.
+- If a label has a leader line, box the symbol at the leader endpoint (not the label text).
+- Include duplicates when the same tag appears at different locations (for example, two FCU-1 units).
+- Ignore uncertain detections below 50 confidence.
+
+Scanning process:
+1. Scan top-left to top-right, then middle row, then bottom row.
+2. In each section, check perimeter walls first, then interior spaces.
+3. Check corners and boundary callouts outside the floor plan.
+
+Coordinate rules:
+- Use percentages only (0-100), origin at top-left.
+- Coordinates represent the symbol box center and size:
+  x, y = center point
+  width, height = box dimensions
+- Use axis-aligned boxes tightly around the symbol icon.
+- Exclude label text and leader lines from the box.
+- Typical symbol size is 1-12 percent of image width/height.
+
+Output schema:
 {
   "symbols": [
     {
-      "name": "FCU-1",
-      "description": "Fan coil unit on exterior wall in upper left bedroom",
-      "confidence": 92,
-      "category": "hvac",
-      "coordinates": {"x": 35.0, "y": 25.0, "width": 3.5, "height": 3.0}
-    },
-    {
-      "name": "EF-1",
-      "description": "Exhaust fan in left bathroom, ceiling mounted",
-      "confidence": 88,
-      "category": "ventilation",
-      "coordinates": {"x": 18.0, "y": 48.0, "width": 2.5, "height": 2.5}
-    },
-    {
-      "name": "SF-2",
-      "description": "Supply fan in lower mechanical area",
-      "confidence": 85,
-      "category": "ventilation",
-      "coordinates": {"x": 52.0, "y": 78.0, "width": 3.0, "height": 3.0}
+      "name": "string",
+      "description": "string",
+      "confidence": 0-100,
+      "category": "hydraulic|pneumatic|mechanical|electrical|other",
+      "coordinates": {
+        "x": 0-100,
+        "y": 0-100,
+        "width": 0-100,
+        "height": 0-100
+      }
     }
   ],
-  "summary": "Found X mechanical components through systematic 9-section scan. Perimeter walls and bathrooms examined carefully.",
-  "totalComponentsFound": 3,
-  "overallConfidence": 88,
-  "scanningNotes": "Multiple FCU-1 units found. Small exhaust fans required careful examination. Some labels positioned outside floor plan boundary with leader lines."
-}`;
+  "summary": "string",
+  "overallConfidence": 0-100
+}
+
+Category guidance:
+- mechanical: FCU, AHU, ERV, HRV, EF, SF, RF, fans, dampers, duct-related units
+- hydraulic: pumps, valves, plumbing devices, water-side equipment
+- electrical: motors, VFD, panels, controllers
+- pneumatic: compressed-air components
+- other: unclear class
+
+Quality checks before returning:
+- All coordinates are percentages and within 0-100.
+- Each symbol has non-empty name and coordinates.
+- Boxes are on symbol graphics, not text labels.`;
 
     console.log('🤖 Using label-focused prompt for symbol detection...');
 
@@ -580,7 +335,8 @@ Return ONLY valid JSON with NO markdown backticks:
         }
       ],
       max_tokens: 4000, // Increased to handle blueprints with many symbols
-      temperature: 0.1 // Lower temperature for more consistent analysis
+      temperature: 0.1, // Lower temperature for more consistent analysis
+      response_format: { type: "json_object" }
     }, {
       timeout: 30000 // 30 second timeout
     });
@@ -658,27 +414,8 @@ Return ONLY valid JSON with NO markdown backticks:
 
     // Structure the final result - map AI response to DetectedSymbol interface
     const symbolsArray = await Promise.all((analysisData.symbols || []).map(async (symbol: RawAISymbol) => {
-      // Handle confidence conversion more carefully
-      let confidence = symbol.confidence || 0;
-
-      // Log raw confidence for debugging
-      console.log(`🔍 Symbol "${symbol.name}" raw confidence:`, confidence);
-
-      // If confidence is already a decimal (0-1), keep it; if percentage (1-100), convert it
-      if (confidence > 1) {
-        confidence = confidence / 100; // Convert percentage to decimal
-        console.log(`🔍 Converted confidence from percentage: ${symbol.confidence}% → ${confidence}`);
-      } else if (confidence < 0.1 && confidence > 0) {
-        // If confidence is suspiciously low (like 0.01), it might be double-converted
-        confidence = Math.min(confidence * 100, 1.0); // Convert back, but cap at 1.0
-        console.log(`🔍 Corrected suspiciously low confidence: ${symbol.confidence} → ${confidence}`);
-      }
-
-      // Ensure minimum confidence for detected symbols (lowered for better detection)
-      if (confidence < 0.4 && confidence > 0) {
-        console.log(`⚠️ Low confidence detected (${confidence}), setting minimum to 0.5 for challenging cases`);
-        confidence = 0.5; // Set lower minimum to catch more symbols
-      }
+      const confidence = normalizeSymbolConfidence(symbol.confidence);
+      console.log(`🔍 Symbol "${symbol.name}" normalized confidence:`, confidence);
 
       const clamped = clampBox(symbol.coordinates);
       const recentered = await recenterBox(clamped, meta);
@@ -699,13 +436,18 @@ Return ONLY valid JSON with NO markdown backticks:
     // Filter out obviously bad boxes after clamping
     const symbols = symbolsArray.filter((s) => Number.isFinite(s.coordinates?.x) && Number.isFinite(s.coordinates?.y));
 
+    const summary =
+      typeof analysisData.summary === 'string' && analysisData.summary.trim().length > 0
+        ? analysisData.summary
+        : 'Analysis completed';
+
     const result: SymbolAnalysisResult = {
       symbols,
       totalSymbols: symbols.length,
       analysisTimestamp: new Date(),
       processingTime,
-      confidence: analysisData.overallConfidence || 0,
-      summary: analysisData.summary || 'Analysis completed'
+      confidence: normalizeOverallConfidence(analysisData.overallConfidence),
+      summary
     };
 
     console.log(`AI Analysis completed: ${result.totalSymbols} symbols detected in ${processingTime}ms`);

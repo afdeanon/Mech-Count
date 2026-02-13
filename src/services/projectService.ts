@@ -69,7 +69,7 @@ async function authenticatedFetch(endpoint: string, options: RequestInit = {}) {
 
 export interface CreateProjectRequest {
   name: string;
-  description: string;
+  description?: string;
 }
 
 export interface UpdateProjectRequest {

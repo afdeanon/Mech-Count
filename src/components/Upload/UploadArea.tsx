@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, FileImage, CheckCircle, AlertCircle, Brain } from 'lucide-react';
+import { Upload, FileImage, CheckCircle, AlertCircle, Brain, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Blueprint } from '@/types';
@@ -11,13 +11,53 @@ interface UploadAreaProps {
   isProcessing: boolean;
   setIsProcessing: (processing: boolean) => void;
   projectId?: string; // Optional project ID to assign blueprint to
+  compact?: boolean;
 }
 
-export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing, projectId }: UploadAreaProps) {
+export function UploadArea({
+  onBlueprintUploaded,
+  isProcessing,
+  setIsProcessing,
+  projectId,
+  compact = false,
+}: UploadAreaProps) {
   const [progress, setProgress] = useState(0);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [guidanceWarning, setGuidanceWarning] = useState<string>('');
+
+  const analyzeFileForGuidance = async (file: File): Promise<string> => {
+    const lowerName = file.name.toLowerCase();
+    const screenshotKeywords = ['screenshot', 'screen shot', 'snip', 'capture'];
+    const likelyScreenshot = screenshotKeywords.some((keyword) => lowerName.includes(keyword));
+
+    if (!file.type.startsWith('image/')) {
+      return '';
+    }
+
+    try {
+      const imageUrl = URL.createObjectURL(file);
+      const dimensions = await new Promise<{ width: number; height: number }>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve({ width: img.width, height: img.height });
+        img.onerror = reject;
+        img.src = imageUrl;
+      });
+      URL.revokeObjectURL(imageUrl);
+
+      const lowResolution = dimensions.width < 1600 || dimensions.height < 900;
+      if (lowResolution || likelyScreenshot) {
+        return 'This upload looks like a screenshot or low-resolution image. For best counts, use full-page or higher-resolution files.';
+      }
+    } catch {
+      return likelyScreenshot
+        ? 'This looks like a screenshot. For best counts, include full context around labels and symbols.'
+        : '';
+    }
+
+    return '';
+  };
 
   const processUpload = useCallback(async (file: File) => {
     setIsProcessing(true);
@@ -115,10 +155,12 @@ export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing,
     }
   }, [onBlueprintUploaded, projectId, setIsProcessing]);
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
+  const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     if (file) {
       setUploadedFile(file);
+      const warning = await analyzeFileForGuidance(file);
+      setGuidanceWarning(warning);
       processUpload(file);
     }
   }, [processUpload]);
@@ -126,7 +168,7 @@ export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing,
   const { getRootProps, getInputProps, isDragActive, isDragReject } = useDropzone({
     onDrop,
     accept: {
-      'image/*': ['.png', '.jpg', '.jpeg', '.bmp', '.tiff', '.pdf']
+      'image/*': ['.png', '.jpg', '.jpeg', '.bmp', '.tiff']
     },
     multiple: false,
     disabled: isProcessing
@@ -143,7 +185,7 @@ export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing,
             Processing Blueprint
           </h3>
           <p className="text-muted-foreground mb-6">
-            {projectId ? 'Uploading and assigning to project...' : 'Uploading your blueprint...'}
+            {projectId ? 'Uploading to this project...' : 'Uploading your file...'}
           </p>
           
           <div className="max-w-md mx-auto space-y-3">
@@ -201,7 +243,7 @@ export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing,
       <div
         {...getRootProps()}
         className={`
-          upload-area p-12 text-center cursor-pointer transition-all duration-300
+          upload-area ${compact ? 'p-8' : 'p-12'} text-center cursor-pointer transition-all duration-300
           ${isDragActive && !isDragReject ? 'upload-area-active' : ''}
           ${isDragReject ? 'border-red-300 bg-red-50' : ''}
         `}
@@ -222,17 +264,19 @@ export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing,
               {isDragActive 
                 ? isDragReject 
                   ? 'File type not supported'
-                  : 'Drop your blueprint here'
-                : 'Upload Your Blueprint'
+                  : 'Drop file to upload'
+                : projectId
+                  ? 'Upload file'
+                  : 'Upload a blueprint'
               }
             </h3>
             
             <p className="text-muted-foreground mb-4">
               {isDragReject
-                ? 'Please upload image files (PNG, JPG, JPEG, BMP, TIFF) or PDF documents'
+                ? 'Please upload image files (PNG, JPG, JPEG, BMP, TIFF)'
                 : projectId 
-                  ? 'Upload your blueprint and automatically assign it to this project'
-                  : 'Upload your blueprint for AI-powered symbol detection and analysis'
+                  ? 'This file will be added to this project.'
+                  : 'AI will detect symbols automatically.'
               }
             </p>
             
@@ -246,8 +290,25 @@ export function UploadArea({ onBlueprintUploaded, isProcessing, setIsProcessing,
       </div>
 
       <div className="text-center text-sm text-muted-foreground">
-        <p>Supported formats: PNG, JPG, JPEG, BMP, TIFF, PDF • Max file size: 10MB</p>
-        <p className="mt-1 text-xs">AI analysis automatically detects mechanical symbols and components</p>
+        <p>Supported formats: PNG, JPG, JPEG, BMP, TIFF • Max file size: 10MB</p>
+        {!compact && (
+          <p className="mt-1 text-xs">AI analysis automatically detects mechanical symbols and components</p>
+        )}
+      </div>
+
+      <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+        <h4 className="text-sm font-semibold text-foreground">Upload Guidance</h4>
+        <ul className="text-xs text-muted-foreground space-y-1">
+          <li>If using screenshots, include enough surrounding area for labels and leader lines.</li>
+          <li>Prefer high-resolution captures (around 1600px+ width) and avoid blurry images.</li>
+          <li>For project-wide totals, upload all relevant pages instead of one cropped section.</li>
+        </ul>
+        {guidanceWarning && (
+          <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <span>{guidanceWarning}</span>
+          </div>
+        )}
       </div>
     </div>
   );
