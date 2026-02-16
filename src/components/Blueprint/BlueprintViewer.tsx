@@ -422,6 +422,10 @@ export function BlueprintViewer({
   const visibleSymbols = reviewLowConfidenceOnly
     ? symbols.filter((s) => s.confidence < LOW_CONFIDENCE_THRESHOLD)
     : symbols;
+  const viewerButtonBaseClass =
+    'h-9 w-9 bg-white text-gray-700 border border-gray-300 hover:bg-[hsl(var(--brand-blue-100))] hover:text-[hsl(var(--brand-blue-700))] hover:border-[hsl(var(--brand-blue-300))] shadow-sm';
+  const viewerButtonActiveClass =
+    'bg-[hsl(var(--brand-blue-200))] text-[hsl(var(--brand-blue-900))] border-[hsl(var(--brand-blue-600))]';
 
   return (
     <div className="blueprint-viewer relative">
@@ -434,9 +438,9 @@ export function BlueprintViewer({
               <TooltipTrigger asChild>
                 <Button
                   size="icon"
-                  variant="secondary"
+                  variant="outline"
                   onClick={handleZoomIn}
-                  className="glass h-9 w-9"
+                  className={viewerButtonBaseClass}
                   title="Zoom in"
                   aria-label="Zoom in"
                 >
@@ -449,9 +453,9 @@ export function BlueprintViewer({
               <TooltipTrigger asChild>
                 <Button
                   size="icon"
-                  variant="secondary"
+                  variant="outline"
                   onClick={handleZoomOut}
-                  className="glass h-9 w-9"
+                  className={viewerButtonBaseClass}
                   title="Zoom out"
                   aria-label="Zoom out"
                 >
@@ -464,9 +468,9 @@ export function BlueprintViewer({
               <TooltipTrigger asChild>
                 <Button
                   size="icon"
-                  variant="secondary"
+                  variant="outline"
                   onClick={handleReset}
-                  className="glass h-9 w-9"
+                  className={viewerButtonBaseClass}
                   title="Back to default view"
                   aria-label="Back to default view"
                 >
@@ -480,14 +484,14 @@ export function BlueprintViewer({
             {symbols.length > 0 && (
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    size="icon"
-                    variant={showSymbolOverlays ? "default" : "secondary"}
-                    onClick={() => setShowSymbolOverlays(!showSymbolOverlays)}
-                    className="glass h-9 w-9"
-                    title={showSymbolOverlays ? "Hide mechanical symbols" : "View mechanical symbols"}
-                    aria-label={showSymbolOverlays ? "Hide mechanical symbols" : "View mechanical symbols"}
-                  >
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => setShowSymbolOverlays(!showSymbolOverlays)}
+                  className={`${viewerButtonBaseClass} ${showSymbolOverlays ? viewerButtonActiveClass : ''}`}
+                  title={showSymbolOverlays ? "Hide mechanical symbols" : "View mechanical symbols"}
+                  aria-label={showSymbolOverlays ? "Hide mechanical symbols" : "View mechanical symbols"}
+                >
                     {showSymbolOverlays ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                   </Button>
                 </TooltipTrigger>
@@ -500,9 +504,9 @@ export function BlueprintViewer({
               <TooltipTrigger asChild>
                 <Button
                   size="icon"
-                  variant={isAddingSymbol ? "default" : "secondary"}
+                  variant="outline"
                   onClick={() => setIsAddingSymbol(!isAddingSymbol)}
-                  className="glass h-9 w-9"
+                  className={`${viewerButtonBaseClass} ${isAddingSymbol ? viewerButtonActiveClass : ''}`}
                   title={isAddingSymbol ? "Cancel add symbol" : "Add symbol"}
                   aria-label={isAddingSymbol ? "Cancel add symbol" : "Add symbol"}
                 >
@@ -517,9 +521,9 @@ export function BlueprintViewer({
               <TooltipTrigger asChild>
                 <Button
                   size="icon"
-                  variant="secondary"
+                  variant="outline"
                   onClick={handleUndo}
-                  className="glass h-9 w-9"
+                  className={viewerButtonBaseClass}
                   disabled={history.length === 0}
                   title="Undo last symbol change"
                   aria-label="Undo last symbol change"
@@ -572,7 +576,13 @@ export function BlueprintViewer({
         )}
         {hasUnsavedChanges && onSaveChanges && (
           <div className="absolute top-3 right-3 z-20">
-            <Button onClick={onSaveChanges} disabled={isSavingChanges} size="sm" className="gap-2">
+            <Button
+              onClick={onSaveChanges}
+              disabled={isSavingChanges}
+              size="sm"
+              variant="outline"
+              className="gap-2 bg-white text-gray-700 border border-gray-300 hover:bg-[hsl(var(--brand-blue-100))] hover:text-[hsl(var(--brand-blue-700))] hover:border-[hsl(var(--brand-blue-300))]"
+            >
               <Save className="w-4 h-4" />
               <span className="hidden sm:inline">{isSavingChanges ? 'Saving...' : 'Save Changes'}</span>
               <span className="sm:hidden">{isSavingChanges ? 'Saving' : 'Save'}</span>

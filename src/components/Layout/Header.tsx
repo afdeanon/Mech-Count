@@ -1,10 +1,10 @@
 import { Button } from '@/components/ui/button';
-import { Settings, FileText, LogOut } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import { useApp } from '@/context/AppContext';
 import { signOutUser } from '@/services/authService';
 import { getDefaultAvatar } from '@/lib/avatar';
 import { useToast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
+import { AppLogo } from '@/components/Layout/AppLogo';
 
 interface HeaderProps {
   showAuthButtons?: boolean;
@@ -13,10 +13,9 @@ interface HeaderProps {
 }
 
 export function Header({ showAuthButtons, onLoginClick, onSignUpClick }: HeaderProps) {
-  const { state, dispatch } = useApp();
+  const { state } = useApp();
   const user = state.auth.user;
   const { toast } = useToast();
-  const navigate = useNavigate();
 
   const handleLogout = async () => {
     try {
@@ -41,12 +40,7 @@ export function Header({ showAuthButtons, onLoginClick, onSignUpClick }: HeaderP
       <div className="bg-card/40 backdrop-blur-xl border border-white/10 rounded-xl shadow-lg">
         <div className="px-8 py-3 flex items-center justify-between">
           {/* Logo */}
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-              <FileText className="w-5 h-5 text-white" />
-            </div>
-            <h1 className="text-xl font-bold text-gradient">MechCount</h1>
-          </div>
+          <AppLogo titleClassName="text-xl" />
 
           {/* Navigation - only show on landing */}
           {showAuthButtons && (

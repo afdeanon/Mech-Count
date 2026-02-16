@@ -1,7 +1,6 @@
 import { auth } from '@/config/firebase';
+import { API_BASE_URL } from '@/config/api';
 import { Project } from '@/types';
-
-const API_BASE_URL = 'http://localhost:3000/api';
 
 interface ApiProject {
   id?: string;
@@ -27,8 +26,10 @@ const getErrorMessage = (error: unknown, fallback: string): string =>
 function transformProject(apiProject: ApiProject): Project {
   return {
     ...apiProject,
-    id: apiProject._id || apiProject.id, // Ensure we have 'id' field from '_id'
-    createdAt: new Date(apiProject.createdAt),
+    id: apiProject._id || apiProject.id || '',
+    name: apiProject.name || 'Untitled Project',
+    description: apiProject.description || '',
+    createdAt: new Date(apiProject.createdAt || Date.now()),
     // Handle both 'blueprints' and 'blueprintIds' from the API
     blueprints: apiProject.blueprints || apiProject.blueprintIds || []
   };

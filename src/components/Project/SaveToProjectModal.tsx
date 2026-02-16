@@ -148,6 +148,14 @@ export function SaveToProjectModal({ isOpen, onClose, blueprint, originalFile, o
             id: saveResponse.data._id || saveResponse.data.id,
             name: blueprintName,
             description: blueprintDescription,
+            imageUrl: saveResponse.data.imageUrl || blueprint.imageUrl,
+            uploadDate: new Date(saveResponse.data.uploadDate || saveResponse.data.createdAt || Date.now()),
+            totalSymbols: saveResponse.data.totalSymbols ?? blueprint.totalSymbols,
+            averageAccuracy: saveResponse.data.averageAccuracy ?? blueprint.averageAccuracy,
+            status: saveResponse.data.status || blueprint.status,
+            projectId: typeof saveResponse.data.projectId === 'string'
+              ? saveResponse.data.projectId
+              : blueprint.projectId,
             // Ensure we keep any additional frontend-only properties if needed
             symbols: blueprint.symbols || saveResponse.data.symbols || []
           };
@@ -191,6 +199,14 @@ export function SaveToProjectModal({ isOpen, onClose, blueprint, originalFile, o
             id: saveResponse.data._id || saveResponse.data.id,
             name: blueprintName,
             description: blueprintDescription,
+            imageUrl: saveResponse.data.imageUrl || blueprint.imageUrl,
+            uploadDate: new Date(saveResponse.data.uploadDate || saveResponse.data.createdAt || Date.now()),
+            totalSymbols: saveResponse.data.totalSymbols ?? blueprint.totalSymbols,
+            averageAccuracy: saveResponse.data.averageAccuracy ?? blueprint.averageAccuracy,
+            status: saveResponse.data.status || blueprint.status,
+            projectId: typeof saveResponse.data.projectId === 'string'
+              ? saveResponse.data.projectId
+              : blueprint.projectId,
             // Ensure we keep any additional frontend-only properties if needed
             symbols: blueprint.symbols || saveResponse.data.symbols || []
           };

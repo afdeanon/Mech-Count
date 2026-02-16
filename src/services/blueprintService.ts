@@ -1,7 +1,6 @@
 import { auth } from '@/config/firebase';
+import { API_BASE_URL, API_ROOT } from '@/config/api';
 import type { Blueprint } from '@/types';
-
-const API_BASE_URL = 'http://localhost:3000/api';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -115,8 +114,8 @@ export async function testBackendConnection(): Promise<ConnectionTestResponse> {
   
   try {
     // Test basic health endpoint
-    console.log('📡 Testing health endpoint:', 'http://localhost:3000/health');
-    const healthResponse = await fetch('http://localhost:3000/health');
+    console.log('📡 Testing health endpoint:', `${API_ROOT}/health`);
+    const healthResponse = await fetch(`${API_ROOT}/health`);
     console.log('📡 Health response status:', healthResponse.status);
     
     if (!healthResponse.ok) {

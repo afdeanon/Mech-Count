@@ -128,6 +128,12 @@ export function EnhancedSymbolAnalysis({ blueprint }: EnhancedSymbolAnalysisProp
   const highConfidenceCount = aiDetected.filter(s => s.confidence >= 0.9).length;
   const mediumConfidenceCount = aiDetected.filter(s => s.confidence >= 0.75 && s.confidence < 0.9).length;
   const lowConfidenceCount = aiDetected.filter(s => s.confidence < 0.75).length;
+  const categoryDistributionData = Object.entries(symbolsByCategory).map(([category, categorySymbols]) => ({
+    name: category,
+    value: categorySymbols.length,
+    fill: categoryColorsGraphs[category as keyof typeof categoryColorsGraphs] || '#6b7280'
+  }));
+  const isSingleCategoryDistribution = categoryDistributionData.length === 1;
   const sourceSymbols = aiDetected.length > 0 ? aiDetected : symbols;
   const inferredBlueprintType = (() => {
     if (sourceSymbols.length === 0) return 'general mechanical blueprint';
@@ -270,26 +276,41 @@ export function EnhancedSymbolAnalysis({ blueprint }: EnhancedSymbolAnalysisProp
               <h4 className="text-sm font-medium mb-4 text-center">Category Distribution</h4>
               <div className="flex-1 flex items-center justify-center">
                 <ResponsiveContainer width="100%" height={320}>
-                  <PieChart>
+                  <PieChart margin={{ top: 16, right: 48, left: 48, bottom: 16 }}>
                     <Pie
-                      data={Object.entries(symbolsByCategory).map(([category, symbols]) => ({
-                        name: category,
-                        value: symbols.length,
-                        fill: categoryColorsGraphs[category as keyof typeof categoryColorsGraphs] || '#6b7280'
-                      }))}
+                      data={categoryDistributionData}
                       cx="50%"
                       cy="50%"
                       innerRadius={60}
                       outerRadius={100}
-                      paddingAngle={3}
+                      paddingAngle={isSingleCategoryDistribution ? 0 : 2}
+                      startAngle={90}
+                      endAngle={-270}
+                      stroke="none"
                       dataKey="value"
-                      label={({ name, percent }) => `${displayCategory(String(name))}: ${(percent * 100).toFixed(0)}%`}
+                      label={
+                        isSingleCategoryDistribution
+                          ? ({ cx, cy }) => (
+                            <text
+                              x={Number(cx)}
+                              y={Number(cy) - 120}
+                              textAnchor="middle"
+                              fill="hsl(var(--muted-foreground))"
+                              fontSize={14}
+                              fontWeight={500}
+                            >
+                              {`${displayCategory(categoryDistributionData[0].name)}: 100%`}
+                            </text>
+                          )
+                          : ({ name, percent }) => `${displayCategory(String(name))}: ${(percent * 100).toFixed(0)}%`
+                      }
                       labelLine={false}
                     >
                       {Object.entries(symbolsByCategory).map(([category], index) => (
                         <Cell
                           key={`cell-${index}`}
                           fill={categoryColorsGraphs[category as keyof typeof categoryColorsGraphs] || '#6b7280'}
+                          stroke="none"
                         />
                       ))}
                     </Pie>

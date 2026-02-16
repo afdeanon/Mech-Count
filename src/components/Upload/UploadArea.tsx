@@ -243,7 +243,7 @@ export function UploadArea({
       <div
         {...getRootProps()}
         className={`
-          upload-area ${compact ? 'p-8' : 'p-12'} text-center cursor-pointer transition-all duration-300
+          upload-area group/upload ${compact ? 'p-8' : 'p-12'} text-center cursor-pointer transition-all duration-300 bg-white hover:bg-white
           ${isDragActive && !isDragReject ? 'upload-area-active' : ''}
           ${isDragReject ? 'border-red-300 bg-red-50' : ''}
         `}
@@ -251,11 +251,11 @@ export function UploadArea({
         <input {...getInputProps()} />
         
         <div className="space-y-4">
-          <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+          <div className="mx-auto w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center transition-colors duration-200 group-hover/upload:bg-[hsl(var(--brand-blue-100))]">
             {isDragReject ? (
               <AlertCircle className="w-8 h-8 text-red-500" />
             ) : (
-              <Upload className="w-8 h-8 text-primary" />
+              <Upload className="w-8 h-8 text-primary transition-colors duration-200 group-hover/upload:text-[hsl(var(--brand-blue-600))]" />
             )}
           </div>
           
@@ -281,7 +281,10 @@ export function UploadArea({
             </p>
             
             {!isDragActive && (
-              <Button variant="outline" className="btn-outline-tech">
+              <Button
+                variant="outline"
+                className="bg-primary/10 text-primary border border-primary/30 hover:bg-[hsl(var(--brand-blue-100))] hover:text-[hsl(var(--brand-blue-700))] hover:border-[hsl(var(--brand-blue-300))] transition-colors duration-200 group-hover/upload:bg-[hsl(var(--brand-blue-100))] group-hover/upload:text-[hsl(var(--brand-blue-700))] group-hover/upload:border-[hsl(var(--brand-blue-300))]"
+              >
                 Choose File
               </Button>
             )}
@@ -296,7 +299,7 @@ export function UploadArea({
         )}
       </div>
 
-      <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+      <div className="rounded-lg border bg-white p-4 space-y-2">
         <h4 className="text-sm font-semibold text-foreground">Upload Guidance</h4>
         <ul className="text-xs text-muted-foreground space-y-1">
           <li>If using screenshots, include enough surrounding area for labels and leader lines.</li>

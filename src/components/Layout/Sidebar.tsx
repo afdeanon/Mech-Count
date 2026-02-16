@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Upload, History, FolderOpen, FileText, LogOut, ChevronUp, ChevronDown } from 'lucide-react';
+import { Upload, History, FolderOpen, LogOut, ChevronUp, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useApp } from '@/context/AppContext';
 import { signOutUser } from '@/services/authService';
 import { getDefaultAvatar } from '@/lib/avatar';
 import { cn } from '@/lib/utils';
+import { AppLogo } from '@/components/Layout/AppLogo';
 
 const navigation = [
   {
@@ -43,12 +44,7 @@ export function Sidebar() {
     <aside className="fixed left-0 top-0 w-56 bg-card border-r border-border h-screen flex flex-col z-40">
       {/* Logo */}
       <div className="p-6 border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-            <FileText className="w-5 h-5 text-white" />
-          </div>
-          <h1 className="text-lg font-bold text-gradient">MechCount</h1>
-        </div>
+        <AppLogo titleClassName="text-lg" />
       </div>
 
       {/* Navigation */}

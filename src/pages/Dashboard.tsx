@@ -155,9 +155,9 @@ export function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[hsl(var(--sidebar-background))]">
       <Sidebar />
-      <main className="ml-56 p-5 overflow-auto">
+      <main className="ml-56 p-5 overflow-auto bg-[hsl(var(--sidebar-background))]">
         <div className="max-w-6xl mx-auto space-y-8">
           <div className="flex items-start justify-between">
             <div>

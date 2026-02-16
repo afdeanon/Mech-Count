@@ -20,9 +20,9 @@ export function History() {
   // Show loading state if auth is still loading
   if (state.auth.isLoading) {
     return (
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-[hsl(var(--sidebar-background))]">
         <Sidebar />
-        <main className="ml-56 p-5">
+        <main className="ml-56 p-5 bg-[hsl(var(--sidebar-background))]">
           <div className="max-w-6xl mx-auto space-y-8">
             <div>
               <h1 className="text-3xl font-bold text-foreground mb-2">
@@ -111,9 +111,9 @@ export function History() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[hsl(var(--sidebar-background))]">
       <Sidebar />
-      <main className="ml-56 p-5">
+      <main className="ml-56 p-5 bg-[hsl(var(--sidebar-background))]">
           <div className="max-w-6xl mx-auto space-y-8">
             <div>
               <h1 className="text-3xl font-bold text-foreground mb-2">
@@ -137,7 +137,7 @@ export function History() {
                         to={`/history/blueprints/${blueprint.id}`}
                         className="block"
                       >
-                        <Card className="project-card h-full">
+                        <Card className="project-card h-full bg-white">
                           <div className="aspect-video bg-muted rounded-lg mb-4 overflow-hidden">
                             <img
                               src={blueprint.imageUrl}
@@ -188,7 +188,7 @@ export function History() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-8 w-8 p-0 hover:bg-secondary"
+                              className="h-8 w-8 p-0 hover:bg-[#FCF9F5]"
                               onClick={(e) => e.preventDefault()}
                             >
                               <MoreVertical className="w-4 h-4" />
@@ -225,12 +225,12 @@ export function History() {
                   placeholder="Search blueprints by name..."
                   value={historySearchTerm}
                   onChange={(e) => setHistorySearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 bg-white"
                 />
               </div>
               
               {allUploadedBlueprints.length === 0 ? (
-                <Card>
+                <Card className="bg-white">
                   <CardContent className="p-8 text-center">
                     <FileImage className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-foreground mb-2">
@@ -242,7 +242,7 @@ export function History() {
                   </CardContent>
                 </Card>
               ) : filteredFullHistoryBlueprints.length === 0 ? (
-                <Card>
+                <Card className="bg-white">
                   <CardContent className="p-8 text-center">
                     <FileImage className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                     <h3 className="text-lg font-semibold text-foreground mb-2">
@@ -261,7 +261,7 @@ export function History() {
                         to={`/history/blueprints/${blueprint.id}`}
                         className="block"
                       >
-                        <Card className="hover:shadow-medium hover:scale-[1.01] transition-all duration-200">
+                        <Card className="bg-white hover:shadow-medium hover:scale-[1.01] transition-all duration-200">
                           <CardContent className="p-6 min-h-[144px]">
                             <div className="flex items-start gap-4">
                               <div className="w-20 h-16 bg-muted rounded-lg overflow-hidden flex-shrink-0">
@@ -314,7 +314,7 @@ export function History() {
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-8 w-8 p-0 hover:bg-secondary"
+                              className="h-8 w-8 p-0 hover:bg-[#FCF9F5]"
                               onClick={(e) => e.preventDefault()}
                             >
                               <MoreVertical className="w-4 h-4" />

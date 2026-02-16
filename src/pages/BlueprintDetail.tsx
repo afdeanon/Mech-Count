@@ -410,7 +410,7 @@ export function BlueprintDetail() {
                   variant="outline" 
                   size="sm"
                   onClick={() => navigate(-1)}
-                  className="gap-2"
+                  className="gap-2 bg-white text-gray-800 border border-border hover:bg-[#FCF9F5] hover:text-gray-900 shadow-sm"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   Back
@@ -458,20 +458,24 @@ export function BlueprintDetail() {
                 )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2 bg-white text-gray-800 border border-border hover:bg-[#FCF9F5] hover:text-gray-900 shadow-sm"
+                    >
                       <Settings className="w-4 h-4" />
                       <span className="hidden sm:inline">Settings</span>
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="min-w-40">
-                    <DropdownMenuItem onClick={handleOpenManageAssignmentDialog}>
+                  <DropdownMenuContent align="end" className="min-w-40 bg-white border border-gray-200">
+                    <DropdownMenuItem className="bg-white focus:bg-[#FCF9F5]" onClick={handleOpenManageAssignmentDialog}>
                       Manage Project Assignment
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleOpenEditDialog}>
+                    <DropdownMenuItem className="bg-white focus:bg-[#FCF9F5]" onClick={handleOpenEditDialog}>
                       Edit Details
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      className="text-destructive focus:text-destructive"
+                      className="bg-white text-destructive focus:bg-[#FCF9F5] focus:text-destructive"
                       onClick={() => setShowDeleteDialog(true)}
                     >
                       Delete Blueprint
@@ -491,12 +495,16 @@ export function BlueprintDetail() {
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-2 bg-[#ED5C1C] text-white border border-[#ED5C1C] hover:bg-[#EC5D20] hover:text-white shadow-sm"
+                  >
                     <ArrowDownToLine className="w-4 h-4" />
                     Export
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="bg-white border border-gray-200">
                   <DropdownMenuItem onClick={handleExportCsv}>
                     Download CSV
                   </DropdownMenuItem>

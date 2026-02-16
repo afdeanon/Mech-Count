@@ -119,7 +119,10 @@ const ErrorState = ({ message, onBack }: { message: string; onBack: () => void }
       <div className="text-center">
         <h2 className="text-2xl font-bold text-foreground mb-2">Project Not Found</h2>
         <p className="text-muted-foreground mb-4">{message}</p>
-        <Button onClick={onBack} variant="outline">Back</Button>
+        <Button onClick={onBack} variant="outline" size="sm" className="gap-2">
+          <ArrowLeft className="w-4 h-4" />
+          Back
+        </Button>
       </div>
     </main>
   </div>
@@ -385,22 +388,31 @@ export function ProjectDetail() {
       <main className="ml-56 p-5">
         <div className="max-w-7xl mx-auto space-y-6">
           <div className="flex items-center justify-between">
-            <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(-1)}
+              className="gap-2 bg-white text-gray-800 border border-border hover:bg-[#FCF9F5] hover:text-gray-900 shadow-sm"
+            >
               <ArrowLeft className="w-4 h-4" />
               Back
             </Button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 bg-white text-gray-800 border border-border hover:bg-[#FCF9F5] hover:text-gray-900 shadow-sm"
+                >
                   <Settings className="w-4 h-4" />
-                  Settings
+                  <span className="hidden sm:inline">Settings</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleOpenEditDialog}>Edit Details</DropdownMenuItem>
+              <DropdownMenuContent align="end" className="bg-white border border-gray-200">
+                <DropdownMenuItem className="bg-white focus:bg-[#FCF9F5]" onClick={handleOpenEditDialog}>Edit Details</DropdownMenuItem>
                 <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
+                  className="bg-white text-destructive focus:bg-[#FCF9F5] focus:text-destructive"
                   onClick={() => setShowDeleteDialog(true)}
                 >
                   Delete Project
