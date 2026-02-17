@@ -457,7 +457,7 @@ export function ProjectDetail() {
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       placeholder="Search blueprints by title..."
-                      className="pl-10"
+                      className="pl-10 bg-white"
                     />
                   </div>
 

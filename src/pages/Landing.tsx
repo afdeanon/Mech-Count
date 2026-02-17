@@ -54,9 +54,8 @@ export function Landing() {
             </h1>
             
             <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed">
-              Upload your engineering blueprints and let our advanced computer vision 
-              technology automatically detect, count, and analyze mechanical symbols 
-              with professional accuracy.
+              Upload, analyze, and manage mechanical blueprint data
+              with an AI-assisted estimation dashboard.
             </p>
 
             <Button 
@@ -95,8 +94,8 @@ export function Landing() {
           </div>
         </div>
 
-        {/* Features Section */}
-        <div className="mt-24">
+        {/* About / Features Section */}
+        <section id="about" className="mt-24 scroll-mt-24">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold text-foreground mb-4">
               Why Choose MechCount?
@@ -126,7 +125,7 @@ export function Landing() {
               </div>
             ))}
           </div>
-        </div>
+        </section>
 
         {/* CTA Section */}
         <div className="mt-24 text-center">
