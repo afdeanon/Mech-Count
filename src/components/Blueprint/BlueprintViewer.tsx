@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Blueprint } from '@/types';
 import { EnhancedSymbolAnalysis } from '@/components/AI/EnhancedSymbolAnalysis';
+import { getSymbolColorByName, withAlpha } from '@/lib/symbolColors';
 
 interface BlueprintViewerProps {
   blueprint: Blueprint;
@@ -390,16 +391,7 @@ export function BlueprintViewer({
       } : s));
   }, [applySymbolsUpdate]);
 
-  const getSymbolColor = (category: string) => {
-    const colors = {
-      hydraulic: '#3b82f6',    // blue-500
-      pneumatic: '#22c55e',    // green-500
-      mechanical: '#f97316',   // orange-500
-      electrical: '#eab308',   // yellow-500
-      other: '#6b7280'         // gray-500
-    };
-    return colors[category as keyof typeof colors] || '#6b7280';
-  };
+  const getSymbolColor = (symbolName: string) => getSymbolColorByName(symbolName);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -662,8 +654,8 @@ export function BlueprintViewer({
                   top: `${pixelPosition.top}px`,
                   width: `${pixelPosition.width}px`,
                   height: `${pixelPosition.height}px`,
-                  borderColor: getSymbolColor(symbol.category || 'other'),
-                  backgroundColor: getSymbolColor(symbol.category || 'other') + '40',
+                  borderColor: getSymbolColor(symbol.name),
+                  backgroundColor: withAlpha(getSymbolColor(symbol.name), 0.25),
                   borderWidth: draggingSymbolId === symbol.id ? '3px' : '2px',
                   borderStyle: 'solid',
                   transition: draggingSymbolId === symbol.id ? 'none' : 'all 0.2s',
@@ -679,7 +671,7 @@ export function BlueprintViewer({
                     top: '50%',
                     width: '8px',
                     height: '8px',
-                    backgroundColor: getSymbolColor(symbol.category || 'other'),
+                    backgroundColor: getSymbolColor(symbol.name),
                   }}
                 />
                 {/* Resize Handles */}
@@ -708,9 +700,9 @@ export function BlueprintViewer({
                   <div
                     className="text-[10px] font-semibold px-2 py-1 rounded-md shadow-sm truncate backdrop-blur-sm border max-w-36"
                     style={{
-                      color: getSymbolColor(symbol.category || 'other'),
+                      color: getSymbolColor(symbol.name),
                       backgroundColor: 'rgba(255, 255, 255, 0.82)',
-                      borderColor: `${getSymbolColor(symbol.category || 'other')}66`,
+                      borderColor: withAlpha(getSymbolColor(symbol.name), 0.4),
                     }}
                   >
                     {symbol.name}
@@ -754,9 +746,9 @@ export function BlueprintViewer({
                 <div
                   className="absolute left-1/2 -translate-x-1/2 top-full mt-1 text-[10px] font-semibold px-2 py-1 rounded-md shadow-sm w-fit backdrop-blur-sm border pointer-events-none"
                   style={{
-                    color: getSymbolColor(symbol.category || 'other'),
+                    color: getSymbolColor(symbol.name),
                     backgroundColor: 'rgba(255, 255, 255, 0.82)',
-                    borderColor: `${getSymbolColor(symbol.category || 'other')}66`,
+                    borderColor: withAlpha(getSymbolColor(symbol.name), 0.4),
                   }}
                 >
                   {Math.round(symbol.confidence * 100)}%

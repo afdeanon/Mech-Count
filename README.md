@@ -1,13 +1,106 @@
 # MechCount
 
-AI-assisted blueprint analysis platform for detecting and counting mechanical symbols.
+AI-assisted blueprint analysis platform for detecting and counting mechanical symbols — built to solve a real, time-consuming problem faced by mechanical estimators every day.
+
+## The Problem
+
+Mechanical estimators spend hours manually counting symbols across dense, multi-page blueprints before they can produce a bid. A single missed valve or fitting can throw off an entire estimate. This tedious, error-prone process is a known pain point in the mechanical contracting industry — and it's still done by hand at most firms.
+
+MechCount automates it.
+
+## Who This Is For
+
+**Mechanical estimators** at HVAC, plumbing, and piping contractors who need to:
+- Rapidly count and categorize mechanical symbols (valves, fittings, fixtures, etc.) across blueprint drawings
+- Reduce manual counting errors that lead to inaccurate bids
+- Keep a searchable history of past blueprint analyses tied to specific projects
+
+Whether you're a one-person estimating department or part of a larger team, MechCount turns a 2-hour manual count into a sub-minute automated analysis.
 
 ## What This Project Does
 
 - Upload blueprint images and run AI-powered symbol detection
 - Group detections by category and summarize counts/confidence
-- Save analyses to project history
-- Manage projects and historical blueprints
+- Review and manually correct any detections before finalizing
+- Save analyses to project history for future reference
+- Manage multiple projects and their associated blueprints
+
+## Current Status & Known Limitations
+
+MechCount is an active work-in-progress built as a portfolio project. The full platform — authentication, file uploads, project management, detection review, and analytics — is functional end-to-end.
+
+The area I'm actively improving is **AI detection accuracy**. The current model detects many mechanical symbols correctly, but struggles with:
+- Symbols that are densely packed or overlapping
+- Less common symbol variants across different blueprint styles
+- Precise bounding box placement on smaller symbols
+
+This is the core engineering challenge I'm focused on. My next steps are experimenting with fine-tuned vision models trained on mechanical drawing datasets and improving the prompt engineering around spatial localization.
+
+Everything outside of detection accuracy — the upload flow, manual correction tools, charts, and project history — works as intended and reflects production-level thinking in architecture and code quality.
+
+
+## Demo
+
+**End-to-end blueprint analysis in under 1 minute**
+
+[![Watch end-to-end demo](./docs/demo-cover.png)](https://your-video-link)
+
+- Upload a mechanical blueprint
+- Detect symbols with AI
+- Review and correct detections
+- Analyze category + symbol count charts
+
+## Video Walkthroughs
+
+### 1) Upload Blueprint (0:45)
+[Watch](https://your-video-link-upload)
+
+What to look for:
+- Accepted file types and upload flow
+- Processing/loading states
+- Project assignment behavior
+
+### 2) AI Symbol Detection (1:10)
+[Watch](https://your-video-link-detection)
+
+What to look for:
+- Detection overlays and confidence labels
+- Symbol-name coloring
+- Auto-assigned categories
+
+### 3) Review & Correct Detections (1:20)
+[Watch](https://your-video-link-review)
+
+What to look for:
+- Rename and recategorize symbols
+- Move/resize detection boxes
+- Save updated symbol data
+
+### 4) Analytics & Charts (0:55)
+[Watch](https://your-video-link-analytics)
+
+What to look for:
+- Category distribution
+- Mechanical symbol counts by name
+- Confidence summary
+
+### 5) Save to Project History (0:40)
+[Watch](https://your-video-link-history)
+
+What to look for:
+- Save workflow
+- History retrieval
+- Blueprint detail reload
+
+## Feature Highlights (Timestamps)
+
+| Feature | Video | Timestamp | Notes |
+|---|---|---:|---|
+| Upload + analyze | End-to-end demo | 0:08 | Starts AI analysis pipeline |
+| Symbol overlays | AI detection | 0:22 | Name-level colored detections |
+| Manual correction | Review flow | 0:41 | Rename and recategorize |
+| Charts update | Analytics | 0:30 | Category + symbol counts |
+| Save to history | History flow | 0:18 | Stores blueprint analysis |
 
 ## Tech Stack
 
@@ -84,17 +177,3 @@ Backend:
 The repository includes GitHub Actions CI at `.github/workflows/ci.yml`:
 - Frontend lint + build
 - Backend TypeScript build
-
-## Deployment Notes
-
-1. Deploy backend first and expose `https://your-api-domain`.
-2. Set frontend `VITE_API_BASE_URL=https://your-api-domain`.
-3. Configure backend `FRONTEND_URL` to the deployed frontend origin.
-4. Verify `/health` and authenticated routes.
-
-## Suggested Next Upgrades
-
-- Add automated API integration tests
-- Add structured logging and request IDs
-- Add metrics dashboards (latency/error rate)
-- Add rate limiting and API abuse protection

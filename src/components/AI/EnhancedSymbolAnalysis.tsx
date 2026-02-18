@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { Blueprint, MechanicalSymbol } from '@/types';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, Legend, BarChart, CartesianGrid, XAxis, YAxis, Bar, Label } from 'recharts';
+import { getSymbolColorByName } from '@/lib/symbolColors';
 
 interface EnhancedSymbolAnalysisProps {
   blueprint: Blueprint;
@@ -133,6 +134,16 @@ export function EnhancedSymbolAnalysis({ blueprint }: EnhancedSymbolAnalysisProp
     value: categorySymbols.length,
     fill: categoryColorsGraphs[category as keyof typeof categoryColorsGraphs] || '#6b7280'
   }));
+  const symbolNameCountData = (() => {
+    const nameCounts: Record<string, { name: string; count: number; category: string }> = {};
+    symbols.forEach((symbol) => {
+      if (!nameCounts[symbol.name]) {
+        nameCounts[symbol.name] = { name: symbol.name, count: 0, category: symbol.category };
+      }
+      nameCounts[symbol.name].count += 1;
+    });
+    return Object.values(nameCounts).sort((a, b) => b.count - a.count);
+  })();
   const isSingleCategoryDistribution = categoryDistributionData.length === 1;
   const sourceSymbols = aiDetected.length > 0 ? aiDetected : symbols;
   const inferredBlueprintType = (() => {
@@ -349,17 +360,7 @@ export function EnhancedSymbolAnalysis({ blueprint }: EnhancedSymbolAnalysisProp
               <div className="flex-1 flex items-center justify-center">
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart
-                    data={(() => {
-                      const nameCounts: Record<string, { name: string; count: number; category: string }> = {};
-                      symbols.forEach(symbol => {
-                        if (!nameCounts[symbol.name]) {
-                          nameCounts[symbol.name] = { name: symbol.name, count: 0, category: symbol.category };
-                        }
-                        nameCounts[symbol.name].count += 1;
-                      });
-                      return Object.values(nameCounts)
-                        .sort((a, b) => b.count - a.count);
-                    })()}
+                    data={symbolNameCountData}
                     layout="vertical"
                     margin={{ top: 20, right: 30, left: 40, bottom: 20 }}
                   >
@@ -373,10 +374,11 @@ export function EnhancedSymbolAnalysis({ blueprint }: EnhancedSymbolAnalysisProp
                     <Tooltip
                       content={({ active, payload, label }) => {
                         if (active && payload && payload.length) {
+                          const symbolName = String(payload[0].payload.name || label || '');
                           const category = payload[0].payload.category;
                           return (
                             <div className="bg-background border rounded-lg p-3 shadow-lg">
-                              <p className="font-medium mb-2">{label}</p>
+                              <p className="font-medium mb-2" style={{ color: getSymbolColorByName(symbolName) }}>{label}</p>
                               <div className="flex items-center gap-2 text-sm">
                                 <span className="capitalize">Count:</span>
                                 <span className="font-medium">{payload[0].value}</span>
@@ -389,20 +391,9 @@ export function EnhancedSymbolAnalysis({ blueprint }: EnhancedSymbolAnalysisProp
                       }}
                     />
                     <Bar dataKey="count">
-                      {(() => {
-                        const nameCounts: Record<string, { name: string; count: number; category: string }> = {};
-                        symbols.forEach(symbol => {
-                          if (!nameCounts[symbol.name]) {
-                            nameCounts[symbol.name] = { name: symbol.name, count: 0, category: symbol.category };
-                          }
-                          nameCounts[symbol.name].count += 1;
-                        });
-                        return Object.values(nameCounts)
-                          .sort((a, b) => b.count - a.count)
-                          .map((item, idx) => (
-                            <Cell key={`bar-cell-${item.name}`} fill={categoryColorsGraphs[item.category as keyof typeof categoryColorsGraphs] || '#6b7280'} />
-                          ));
-                      })()}
+                      {symbolNameCountData.map((item) => (
+                        <Cell key={`bar-cell-${item.name}`} fill={getSymbolColorByName(item.name)} />
+                      ))}
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>
@@ -457,7 +448,7 @@ export function EnhancedSymbolAnalysis({ blueprint }: EnhancedSymbolAnalysisProp
                         {isExpanded && items.map((item) => (
                           <tr key={item.id} className="hover:bg-gray-50 transition-colors">
                             <td className="px-6 py-4">
-                              <span className="text-sm font-medium text-gray-900 truncate block">{item.name}</span>
+                              <span className="text-sm font-medium truncate block" style={{ color: getSymbolColorByName(item.name) }}>{item.name}</span>
                             </td>
                             <td className="px-6 py-4">
                               <span className="text-sm text-gray-600 line-clamp-2">{item.description}</span>
