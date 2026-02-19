@@ -41,9 +41,16 @@ Everything outside of detection accuracy — the upload flow, manual correction 
 
 ## Demo
 
-**End-to-end blueprint analysis in under 1 minute**
+**Watch MechCount in action**
 
-[![Watch end-to-end demo](./docs/demo-cover.png)](https://your-video-link)
+<p align="center">
+  <video src="./public/MechCountDemo-AIAnalysisOverallAnalysis.mp4" controls preload="metadata" width="920"></video>
+</p>
+
+<p align="center">
+  If the embedded player does not render in your viewer:
+  <a href="./public/MechCountDemo-AIAnalysisOverallAnalysis.mp4">Open the full demo video</a>
+</p>
 
 - Upload a mechanical blueprint
 - Detect symbols with AI
@@ -53,7 +60,9 @@ Everything outside of detection accuracy — the upload flow, manual correction 
 ## Video Walkthroughs
 
 ### 1) Upload Blueprint (0:45)
-[Watch](./public/MechCount-UploadBlueprint.mp4)
+<video src="./public/MechCount-UploadBlueprint.mp4" controls preload="metadata" width="920"></video>
+
+[Open video](./public/MechCount-UploadBlueprint.mp4)
 
 What to look for:
 - Accepted file types and upload flow
@@ -61,7 +70,9 @@ What to look for:
 - Project assignment behavior
 
 ### 2) AI Symbol Detection (1:10)
-[Watch](./public/MechCountDemo-AIAnalysisOverallAnalysis.mp4)
+<video src="./public/MechCountDemo-AIAnalysisOverallAnalysis.mp4" controls preload="metadata" width="920"></video>
+
+[Open video](./public/MechCountDemo-AIAnalysisOverallAnalysis.mp4)
 
 What to look for:
 - Detection overlays and confidence labels
@@ -69,7 +80,9 @@ What to look for:
 - Auto-assigned categories
 
 ### 3) Review & Correct Detections (1:20)
-[Watch](./public/MechCountDemo-MoveAndAddSymbols.mp4)
+<video src="./public/MechCountDemo-MoveAndAddSymbols.mp4" controls preload="metadata" width="920"></video>
+
+[Open video](./public/MechCountDemo-MoveAndAddSymbols.mp4)
 
 What to look for:
 - Rename and recategorize symbols
@@ -77,7 +90,9 @@ What to look for:
 - Save updated symbol data
 
 ### 4) Analytics & Charts (0:55)
-[Watch](./public/mech-count-userauth.mp4)
+<video src="./public/mech-count-userauth.mp4" controls preload="metadata" width="920"></video>
+
+[Open video](./public/mech-count-userauth.mp4)
 
 What to look for:
 - Category distribution
@@ -85,20 +100,14 @@ What to look for:
 - Confidence summary
 
 ### 5) Save to Project History (0:40)
-[Watch](./public/MechCountDemo-DeleteSymbolAndSaveBlueprinInCreatedProject.mp4)
+<video src="./public/MechCountDemo-DeleteSymbolAndSaveBlueprinInCreatedProject.mp4" controls preload="metadata" width="920"></video>
+
+[Open video](./public/MechCountDemo-DeleteSymbolAndSaveBlueprinInCreatedProject.mp4)
 
 What to look for:
 - Save workflow
 - History retrieval
 - Blueprint detail reload
-
-## Additional Demo Videos
-
-- User Auth Demo: [Watch](./public/mech-count-userauth.mp4)
-- Upload Blueprint Demo: [Watch](./public/MechCount-UploadBlueprint.mp4)
-- AI Analysis Overall Demo: [Watch](./public/MechCountDemo-AIAnalysisOverallAnalysis.mp4)
-- Move and Add Symbol Demo: [Watch](./public/MechCountDemo-MoveAndAddSymbols.mp4)
-- Delete Symbol and Save Blueprint to Created Project Demo: [Watch](./public/MechCountDemo-DeleteSymbolAndSaveBlueprinInCreatedProject.mp4)
 
 ## Feature Highlights (Timestamps)
 
