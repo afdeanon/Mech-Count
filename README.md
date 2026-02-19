@@ -44,13 +44,13 @@ Everything outside of detection accuracy — the upload flow, manual correction 
 **Watch MechCount in action**
 
 <p align="center">
-  <a href="https://youtu.be/ZqeYG3nY_YY">
-    <img src="https://img.youtube.com/vi/ZqeYG3nY_YY/hqdefault.jpg" alt="Watch MechCount full demo" width="920" />
+  <a href="https://youtu.be/HYlSyUR6CBI?si=2FYBLaiUJLThkIma">
+    <img src="https://img.youtube.com/vi/HYlSyUR6CBI/maxresdefault.jpg" alt="Watch MechCount full demo" width="920" />
   </a>
 </p>
 
 <p align="center">
-  <a href="https://youtu.be/ZqeYG3nY_YY">Play full demo video</a>
+  <a href="https://youtu.be/HYlSyUR6CBI?si=2FYBLaiUJLThkIma">Play full demo video</a>
 </p>
 
 - Upload a mechanical blueprint
@@ -62,7 +62,7 @@ Everything outside of detection accuracy — the upload flow, manual correction 
 
 ### 1) Upload Blueprint (0:45)
 <a href="https://youtu.be/nAkwM4y8Se8">
-  <img src="https://img.youtube.com/vi/nAkwM4y8Se8/hqdefault.jpg" alt="Upload Blueprint demo" width="920" />
+  <img src="https://img.youtube.com/vi/nAkwM4y8Se8/maxresdefault.jpg" alt="Upload Blueprint demo" width="920" />
 </a>
 
 [Play video](https://youtu.be/nAkwM4y8Se8)
@@ -74,7 +74,7 @@ What to look for:
 
 ### 2) AI Symbol Detection (1:10)
 <a href="https://youtu.be/ZqeYG3nY_YY">
-  <img src="https://img.youtube.com/vi/ZqeYG3nY_YY/hqdefault.jpg" alt="Delete a Symbol, AI and Overall Analysis demo" width="920" />
+  <img src="https://img.youtube.com/vi/ZqeYG3nY_YY/maxresdefault.jpg" alt="Delete a Symbol, AI and Overall Analysis demo" width="920" />
 </a>
 
 [Play video](https://youtu.be/ZqeYG3nY_YY)
@@ -86,7 +86,7 @@ What to look for:
 
 ### 3) Review & Correct Detections (1:20)
 <a href="https://youtu.be/ZWPPgPOTw5U">
-  <img src="https://img.youtube.com/vi/ZWPPgPOTw5U/hqdefault.jpg" alt="Move and Add Symbols demo" width="920" />
+  <img src="https://img.youtube.com/vi/ZWPPgPOTw5U/maxresdefault.jpg" alt="Move and Add Symbols demo" width="920" />
 </a>
 
 [Play video](https://youtu.be/ZWPPgPOTw5U)
@@ -98,7 +98,7 @@ What to look for:
 
 ### 4) User Authentication
 <a href="https://youtu.be/HbCndXqhEeM">
-  <img src="https://img.youtube.com/vi/HbCndXqhEeM/hqdefault.jpg" alt="User Authentication demo" width="920" />
+  <img src="https://img.youtube.com/vi/HbCndXqhEeM/maxresdefault.jpg" alt="User Authentication demo" width="920" />
 </a>
 
 [Play video](https://youtu.be/HbCndXqhEeM)
