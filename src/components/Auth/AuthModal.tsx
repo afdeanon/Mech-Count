@@ -89,7 +89,7 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl p-0 overflow-hidden">
+      <DialogContent className="max-w-4xl p-0 overflow-hidden [&>button]:text-white [&>button]:opacity-90 [&>button]:bg-black/30 [&>button]:hover:bg-black/45 [&>button]:hover:text-white">
         <div className="flex">
           {/* Left Side - Form */}
           <div className="flex-1 p-8">
@@ -194,18 +194,18 @@ export function AuthModal({ isOpen, onClose, initialMode = 'login' }: AuthModalP
 
           {/* Right Side - Image */}
           <div className="flex-1 bg-gradient-tech relative overflow-hidden">
-            <div className="absolute inset-0 bg-black/20" />
+            <div className="absolute inset-0 bg-black/65 backdrop-blur-[1px]" />
             <img 
-              src="https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=600&h=800&fit=crop"
-              alt="Blueprint Engineering"
+              src="/blueprint-detections.png"
+              alt="Mechanical blueprint analysis preview"
               className="w-full h-full object-cover"
             />
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center text-white p-8">
+              <div className="text-center text-white p-8 max-w-md">
                 <h3 className="text-2xl font-bold mb-4">
                   Advanced Blueprint Analysis
                 </h3>
-                <p className="text-lg opacity-90">
+                <p className="text-lg opacity-95">
                   Detect and count mechanical symbols with precision using AI-powered computer vision
                 </p>
               </div>

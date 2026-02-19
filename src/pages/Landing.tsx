@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Header } from '@/components/Layout/Header';
 import { AuthModal } from '@/components/Auth/AuthModal';
-import { ArrowRight, CheckCircle, Zap, Shield, BarChart3 } from 'lucide-react';
+import { ArrowRight, CheckCircle } from 'lucide-react';
 
 export function Landing() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -18,24 +18,6 @@ export function Landing() {
     setAuthModalOpen(true);
   };
 
-  const features = [
-    {
-      icon: Zap,
-      title: 'AI-Powered Detection',
-      description: 'Advanced computer vision algorithms detect mechanical symbols with 95%+ accuracy'
-    },
-    {
-      icon: BarChart3,
-      title: 'Detailed Analytics',
-      description: 'Get comprehensive analysis with symbol counts, accuracy metrics, and insights'
-    },
-    {
-      icon: Shield,
-      title: 'Secure & Private',
-      description: 'Your blueprints are processed securely with enterprise-grade privacy protection'
-    }
-  ];
-
   return (
     <div className="min-h-screen bg-gradient-surface">
       <Header 
@@ -45,7 +27,7 @@ export function Landing() {
       />
 
       {/* Hero Section */}
-      <main className="container mx-auto px-4 py-32">
+      <main className="container mx-auto px-4 pt-28 md:pt-32 pb-20 md:pb-24">
         <div className="text-center max-w-4xl mx-auto">
           <div className="animate-fade-in">
             <h1 className="text-5xl md:text-6xl font-bold text-foreground mb-6">
@@ -69,63 +51,30 @@ export function Landing() {
           </div>
 
           {/* Demo Image */}
-          <div className="mt-16 animate-slide-up">
-            <div className="glass-card p-8 max-w-4xl mx-auto">
-              <img 
-                src="https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=1200&h=600&fit=crop"
-                alt="Blueprint Analysis Demo"
-                className="w-full rounded-lg shadow-medium"
+          <div className="mt-12 md:mt-16 animate-slide-up">
+            <div className="glass-card p-4 sm:p-6 md:p-8 max-w-5xl mx-auto">
+              <img
+                src="/blueprint-detections.png"
+                alt="Mechanical blueprint analysis with detected symbols"
+                className="w-full h-auto max-h-[45vh] sm:max-h-[52vh] md:max-h-[60vh] lg:max-h-[64vh] rounded-lg shadow-medium object-contain"
               />
               <div className="flex items-center justify-center gap-8 mt-6 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="w-4 h-4 text-success" />
-                  <span>24 symbols detected</span>
+                  <span>11 symbols detected</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle className="w-4 h-4 text-success" />
-                  <span>92.5% accuracy</span>
+                  <span>96% accuracy</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle className="w-4 h-4 text-success" />
-                  <span>3.2s processing time</span>
+                  <span>10.3s processing time</span>
                 </div>
               </div>
             </div>
           </div>
         </div>
-
-        {/* About / Features Section */}
-        <section id="about" className="mt-24 scroll-mt-24">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-foreground mb-4">
-              Why Choose MechCount?
-            </h2>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Built specifically for engineering professionals who need accurate, 
-              fast, and reliable blueprint analysis.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {features.map((feature, index) => (
-              <div 
-                key={feature.title}
-                className="glass-card p-8 text-center animate-fade-in"
-                style={{ animationDelay: `${index * 0.2}s` }}
-              >
-                <div className="w-16 h-16 bg-gradient-primary rounded-full flex items-center justify-center mx-auto mb-6">
-                  <feature.icon className="w-8 h-8 text-white" />
-                </div>
-                <h3 className="text-xl font-semibold text-foreground mb-4">
-                  {feature.title}
-                </h3>
-                <p className="text-muted-foreground leading-relaxed">
-                  {feature.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </section>
 
         {/* CTA Section */}
         <div className="mt-24 text-center">

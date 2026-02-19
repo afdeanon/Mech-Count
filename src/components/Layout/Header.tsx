@@ -70,17 +70,6 @@ export function Header({ showAuthButtons, onLoginClick, onSignUpClick }: HeaderP
     </>
   );
 
-  const landingNav = (
-    <nav className="hidden md:flex items-center gap-6">
-      <a
-        href="#about"
-        className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-      >
-        About
-      </a>
-    </nav>
-  );
-
   if (showAuthButtons) {
     return (
       <header className="fixed inset-x-0 top-0 z-50 px-3 sm:px-6">
@@ -99,7 +88,6 @@ export function Header({ showAuthButtons, onLoginClick, onSignUpClick }: HeaderP
             )}
           >
             <AppLogo titleClassName="text-lg sm:text-xl" />
-            {landingNav}
             <div className="flex items-center gap-2 sm:gap-3">{authButtons}</div>
           </div>
         </div>

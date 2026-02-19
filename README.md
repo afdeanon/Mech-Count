@@ -53,7 +53,7 @@ Everything outside of detection accuracy — the upload flow, manual correction 
 ## Video Walkthroughs
 
 ### 1) Upload Blueprint (0:45)
-[Watch](https://your-video-link-upload)
+[Watch](./public/MechCount-UploadBlueprint.mp4)
 
 What to look for:
 - Accepted file types and upload flow
@@ -61,7 +61,7 @@ What to look for:
 - Project assignment behavior
 
 ### 2) AI Symbol Detection (1:10)
-[Watch](https://your-video-link-detection)
+[Watch](./public/MechCountDemo-AIAnalysisOverallAnalysis.mp4)
 
 What to look for:
 - Detection overlays and confidence labels
@@ -69,7 +69,7 @@ What to look for:
 - Auto-assigned categories
 
 ### 3) Review & Correct Detections (1:20)
-[Watch](https://your-video-link-review)
+[Watch](./public/MechCountDemo-MoveAndAddSymbols.mp4)
 
 What to look for:
 - Rename and recategorize symbols
@@ -77,7 +77,7 @@ What to look for:
 - Save updated symbol data
 
 ### 4) Analytics & Charts (0:55)
-[Watch](https://your-video-link-analytics)
+[Watch](./public/mech-count-userauth.mp4)
 
 What to look for:
 - Category distribution
@@ -85,12 +85,20 @@ What to look for:
 - Confidence summary
 
 ### 5) Save to Project History (0:40)
-[Watch](https://your-video-link-history)
+[Watch](./public/MechCountDemo-DeleteSymbolAndSaveBlueprinInCreatedProject.mp4)
 
 What to look for:
 - Save workflow
 - History retrieval
 - Blueprint detail reload
+
+## Additional Demo Videos
+
+- User Auth Demo: [Watch](./public/mech-count-userauth.mp4)
+- Upload Blueprint Demo: [Watch](./public/MechCount-UploadBlueprint.mp4)
+- AI Analysis Overall Demo: [Watch](./public/MechCountDemo-AIAnalysisOverallAnalysis.mp4)
+- Move and Add Symbol Demo: [Watch](./public/MechCountDemo-MoveAndAddSymbols.mp4)
+- Delete Symbol and Save Blueprint to Created Project Demo: [Watch](./public/MechCountDemo-DeleteSymbolAndSaveBlueprinInCreatedProject.mp4)
 
 ## Feature Highlights (Timestamps)
 
