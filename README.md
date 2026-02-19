@@ -108,28 +108,6 @@ What to look for:
 - Auth UI behavior
 - Session handling experience
 
-### 5) Save to Project History (0:40)
-<a href="./public/MechCountDemo-DeleteSymbolAndSaveBlueprinInCreatedProject.mp4">
-  <img src="./public/blueprint-detections.png" alt="Save to Project History demo" width="920" />
-</a>
-
-[Play video](./public/MechCountDemo-DeleteSymbolAndSaveBlueprinInCreatedProject.mp4)
-
-What to look for:
-- Save workflow
-- History retrieval
-- Blueprint detail reload
-
-## Feature Highlights (Timestamps)
-
-| Feature | Video | Timestamp | Notes |
-|---|---|---:|---|
-| Upload + analyze | End-to-end demo | 0:08 | Starts AI analysis pipeline |
-| Symbol overlays | AI detection | 0:22 | Name-level colored detections |
-| Manual correction | Review flow | 0:41 | Rename and recategorize |
-| Charts update | Analytics | 0:30 | Category + symbol counts |
-| Save to history | History flow | 0:18 | Stores blueprint analysis |
-
 ## Tech Stack
 
 - Frontend: React, TypeScript, Vite, Tailwind, Recharts, Firebase Auth
