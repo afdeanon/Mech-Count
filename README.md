@@ -1,6 +1,6 @@
 # MechCount
 
-AI-assisted blueprint analysis platform for detecting and counting mechanical symbols — built to solve a real, time-consuming problem faced by mechanical estimators every day.
+AI-assisted blueprint analysis platform for detecting and counting mechanical symbols - built to solve a real, time-consuming problem faced by mechanical estimators every day. 
 
 ## The Problem
 
@@ -19,29 +19,28 @@ Whether you're a one-person estimating department or part of a larger team, Mech
 
 ## What This Project Does
 
-- Upload blueprint images and run AI-powered symbol detection
-- Group detections by category and summarize counts/confidence
-- Review and manually correct any detections before finalizing
-- Save analyses to project history for future reference
-- Manage multiple projects and their associated blueprints
+1.  Upload blueprint images and run AI-powered symbol detection
+2.  Group detections by category and summarize counts/confidence
+3.  Review and manually correct any detections before finalizing
+4.  Save analyses to project history for future reference
+5.  Manage multiple projects and their associated blueprints
 
 ## Current Status & Known Limitations
 
-MechCount is an active work-in-progress built as a portfolio project. The full platform — authentication, file uploads, project management, detection review, and analytics — is functional end-to-end.
+MechCount is an active work-in-progress project. The full platform — authentication, file uploads, project management, detection review, and analytics — is functional end-to-end.
 
-The area I'm actively improving is **AI detection accuracy**. The current model detects many mechanical symbols correctly, but struggles with:
-- Symbols that are densely packed or overlapping
-- Less common symbol variants across different blueprint styles
-- Precise bounding box placement on smaller symbols
+The area I'm currently improving is **AI detection accuracy**. The current model detects many mechanical symbols correctly, but struggles with:
+- Detecting symbols that are densley packed or overlapping
+- Placing bounding boxes precisely at the right location 
 
-This is the core engineering challenge I'm focused on. My next steps are experimenting with fine-tuned vision models trained on mechanical drawing datasets and improving the prompt engineering around spatial localization.
+This is the core engineering challenge I'm determined to solve. My next steps are experimenting with fine-tuned vision models trained on mechanical drawing datasets and improving the prompt engineering around spatial localization.
 
-Everything outside of detection accuracy — the upload flow, manual correction tools, charts, and project history — works as intended and reflects production-level thinking in architecture and code quality.
+Everything outside of detection accuracy — the upload flow, manual correction tools, charts, and project history — works as intended.
 
 
 ## Demo
 
-**Watch MechCount in action**
+**MechCount Full Demo Video**
 
 <p align="center">
   <a href="https://youtu.be/HYlSyUR6CBI?si=2FYBLaiUJLThkIma">
@@ -53,48 +52,35 @@ Everything outside of detection accuracy — the upload flow, manual correction 
   <a href="https://youtu.be/HYlSyUR6CBI?si=2FYBLaiUJLThkIma">Play full demo video</a>
 </p>
 
-- Upload a mechanical blueprint
-- Detect symbols with AI
-- Review and correct detections
-- Analyze category + symbol count charts
+## Feaures:
+**- Upload Blueprint** - Upload mechanical blueprints, detect symbols using AI, and interact directly with detections on the drawing. Users can add, edit, move, or delete symbols and save finalized blueprints to a project.
+**- Blueprint History** - View recently uploaded blueprints, browse the complete analysis history, or search for an uploaded blueprint. Users can select previous blueprints to review results or delete outdated analyses.
+**- Project Management** - Create and manage projects that group related blueprints. Blueprints can be uploaded directly into a project or added later to maintain organized estimating workflows.
+**- Blueprint Details and Analysis** - Edit blueprint data, review AI-generated symbol analysis, and make final adjustments to detections before saving. Export structured symbol data as a CSV file for use in estimating tools or spreadsheets.
 
 ## Video Walkthroughs
 
-### 1) Upload Blueprint (0:45)
+### 1) Upload Blueprint
 <a href="https://youtu.be/nAkwM4y8Se8">
   <img src="https://img.youtube.com/vi/nAkwM4y8Se8/maxresdefault.jpg" alt="Upload Blueprint demo" width="920" />
 </a>
 
 [Play video](https://youtu.be/nAkwM4y8Se8)
 
-What to look for:
-- Accepted file types and upload flow
-- Processing/loading states
-- Project assignment behavior
-
-### 2) AI Symbol Detection (1:10)
+### 2) AI Symbol Detection & Analysis
 <a href="https://youtu.be/ZqeYG3nY_YY">
   <img src="https://img.youtube.com/vi/ZqeYG3nY_YY/maxresdefault.jpg" alt="Delete a Symbol, AI and Overall Analysis demo" width="920" />
 </a>
 
 [Play video](https://youtu.be/ZqeYG3nY_YY)
 
-What to look for:
-- Detection overlays and confidence labels
-- Symbol-name coloring
-- Auto-assigned categories
-
-### 3) Review & Correct Detections (1:20)
+### 3) Review & Correct Detections
 <a href="https://youtu.be/ZWPPgPOTw5U">
   <img src="https://img.youtube.com/vi/ZWPPgPOTw5U/maxresdefault.jpg" alt="Move and Add Symbols demo" width="920" />
 </a>
 
 [Play video](https://youtu.be/ZWPPgPOTw5U)
 
-What to look for:
-- Rename and recategorize symbols
-- Move/resize detection boxes
-- Save updated symbol data
 
 ### 4) User Authentication
 <a href="https://youtu.be/HbCndXqhEeM">
@@ -102,11 +88,6 @@ What to look for:
 </a>
 
 [Play video](https://youtu.be/HbCndXqhEeM)
-
-What to look for:
-- Sign up/login flow
-- Auth UI behavior
-- Session handling experience
 
 ## Tech Stack
 
