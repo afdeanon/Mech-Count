@@ -53,13 +53,12 @@ Everything outside of detection accuracy — the upload flow, manual correction 
 </p>
 
 ## Feaures:
-1. **Upload Blueprint**    - Upload mechanical blueprints as image files, detect symbols using AI, and interact directly with detections on the drawing. Users can add, edit, move, or delete symbols and save finalized blueprints to a project.
+1. ***Upload Blueprint***- Upload mechanical blueprints as image files and detect symbols using AI.
+2. ***Add, Edit, Move, or Delete Symbols*** - Modify blueprint symbol detections directly on a blueprint
 
-2. **Blueprint History**    - View recently uploaded blueprints, browse the complete analysis history, or search for an uploaded blueprint. Users can select previous blueprints to review results or delete outdated analyses.
-
-3. **Project Management**    - Create and manage projects that group related blueprints. Blueprints can be uploaded directly into a project or added later to maintain organized estimating workflows.
-
-4. **Blueprint Details and Analysis**    - Edit blueprint data, review AI-generated symbol analysis, and make final adjustments to detections before saving. Export structured symbol data as a CSV file for use in estimating tools or spreadsheets.
+4. ***Blueprint History*** - View recently uploaded blueprints, browse through user history, search for an uploaded blueprint.
+5. ***Blueprint Details & Analysis*** - Edit blueprint data, review AI-generated symbols analysis, and make final adjustments to detections before saving. Export structured blueprint data as a CSV file for use in estimating tools or spreadsheets. 
+6. ***Project Management*** - Create and manage projects that group related blueprints. Blueprints can be uploaded directly into a project or added ;ater to maintain organized estimating workflows.
 
 ## Video Walkthroughs
 
