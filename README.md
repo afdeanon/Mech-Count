@@ -58,7 +58,7 @@ Everything outside of detection accuracy — the upload flow, manual correction 
 
 4. ***Blueprint History*** - View recently uploaded blueprints, browse through user history, search for an uploaded blueprint.
 5. ***Blueprint Details & Analysis*** - Edit blueprint data, review AI-generated symbols analysis, and make final adjustments to detections before saving. Export structured blueprint data as a CSV file for use in estimating tools or spreadsheets. 
-6. ***Project Management*** - Create and manage projects that group related blueprints. Blueprints can be uploaded directly into a project or added ;ater to maintain organized estimating workflows.
+6. ***Project Management*** - Create and manage projects that group related blueprints. Blueprints can be uploaded directly into a project or added later to maintain organized estimating workflows.
 
 ## Video Walkthroughs
 
