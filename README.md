@@ -15,8 +15,6 @@ MechCount automates it.
 - Reduce manual counting errors that lead to inaccurate bids
 - Keep a searchable history of past blueprint analyses tied to specific projects
 
-Whether you're a one-person estimating department or part of a larger team, MechCount turns a 2-hour manual count into a sub-minute automated analysis.
-
 ## What This Project Does
 
 1.  Upload blueprint images and run AI-powered symbol detection
